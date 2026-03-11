@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Email Triage</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      color: #201f1e;
+      background: #faf9f8;
+      padding: 12px;
+    }
+
+    h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #0078d4;
+      margin: 12px 0 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #edebe9;
+    }
+    h2:first-of-type { margin-top: 0; }
+
+    .field { margin-bottom: 8px; }
+    label  { display: block; font-weight: 600; margin-bottom: 2px; color: #323130; }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid #8a8886;
+      border-radius: 2px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #fff;
+      color: #201f1e;
+    }
+    input[readonly] { background: #f3f2f1; color: #605e5c; }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #0078d4;
+      box-shadow: 0 0 0 1px #0078d4;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 8px;
+      background: #0078d4;
+      color: #fff;
+      border: none;
+      border-radius: 2px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button:hover { background: #106ebe; }
+    button:active { background: #005a9e; }
+
+    .status     { min-height: 18px; margin-top: 6px; font-size: 12px; text-align: center; }
+    .status.ok  { color: #107c10; }
+    .status.error { color: #a4262c; }
+  </style>
+</head>
+<body>
+
+  <h2>Email</h2>
+
+  <div class="field">
+    <label for="from">From</label>
+    <input type="text" id="from" readonly placeholder="loading…"/>
+  </div>
+  <div class="field">
+    <label for="subject">Subject</label>
+    <input type="text" id="subject" readonly placeholder="loading…"/>
+  </div>
+
+  <h2>Triage</h2>
+
+  <div class="field">
+    <label for="f-reference">Reference</label>
+    <input type="text" id="f-reference" placeholder="e.g. ticket or case number"/>
+  </div>
+  <div class="field">
+    <label for="f-category">Category</label>
+    <input type="text" id="f-category" placeholder="e.g. Support / Sales / Finance"/>
+  </div>
+  <div class="field">
+    <label for="f-priority">Priority</label>
+    <input type="text" id="f-priority" placeholder="e.g. High / Medium / Low"/>
+  </div>
+  <div class="field">
+    <label for="f-owner">Owner</label>
+    <input type="text" id="f-owner" placeholder="assignee name or alias"/>
+  </div>
+  <div class="field">
+    <label for="f-notes">Notes</label>
+    <input type="text" id="f-notes" placeholder="free-form notes"/>
+  </div>
+
+  <div class="field">
+    <label for="f-country">Country</label>
+    <select id="f-country"></select>
+  </div>
+  <div class="field">
+    <label for="f-year">Year</label>
+    <select id="f-year"></select>
+  </div>
+  <div class="field">
+    <label for="f-quarter">Quarter</label>
+    <select id="f-quarter">
+      <option>Q1</option>
+      <option>Q2</option>
+      <option>Q3</option>
+      <option>Q4</option>
+    </select>
+  </div>
+
+  <button id="copy-btn">Copy to Clipboard</button>
+  <div id="status" class="status"></div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>

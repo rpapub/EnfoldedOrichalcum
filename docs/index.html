@@ -1,11 +1,248 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EnfoldedOrichalcum</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Email Triage Add-in — Testbed</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      color: #201f1e;
+      background: #f3f2f1;
+      padding: 24px 16px;
+    }
+
+    header {
+      max-width: 960px;
+      margin: 0 auto 24px;
+    }
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0078d4;
+    }
+    header p { margin-top: 6px; color: #605e5c; }
+
+    .layout {
+      display: flex;
+      gap: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    /* ── Preview pane ── */
+    .preview-wrap {
+      flex: 0 0 320px;
+    }
+    .preview-badge {
+      display: inline-block;
+      background: #fff4ce;
+      color: #835c00;
+      border: 1px solid #f7e599;
+      border-radius: 2px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .preview-frame {
+      background: #fff;
+      border: 1px solid #c8c6c4;
+      border-radius: 4px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    /* ── Form styles (shared with taskpane.html) ── */
+    .preview-frame h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0078d4;
+      margin: 10px 0 5px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #edebe9;
+    }
+    .preview-frame h2:first-of-type { margin-top: 0; }
+    .field { margin-bottom: 7px; }
+    label  { display: block; font-weight: 600; font-size: 12px; margin-bottom: 2px; color: #323130; }
+    input[type="text"], select {
+      width: 100%; padding: 4px 7px;
+      border: 1px solid #8a8886; border-radius: 2px;
+      font-size: 12px; font-family: inherit;
+      background: #fff; color: #201f1e;
+    }
+    input[readonly] { background: #f3f2f1; color: #605e5c; }
+    input:focus, select:focus {
+      outline: none; border-color: #0078d4; box-shadow: 0 0 0 1px #0078d4;
+    }
+    button.copy-btn {
+      display: block; width: 100%; margin-top: 12px; padding: 7px;
+      background: #0078d4; color: #fff; border: none; border-radius: 2px;
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    button.copy-btn:hover  { background: #106ebe; }
+    button.copy-btn:active { background: #005a9e; }
+    .status     { min-height: 16px; margin-top: 5px; font-size: 11px; text-align: center; }
+    .status.ok  { color: #107c10; }
+    .status.error { color: #a4262c; }
+
+    /* ── Install guide ── */
+    .guide {
+      flex: 1 1 400px;
+    }
+    .guide h2 {
+      font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #201f1e;
+    }
+    .guide h3 {
+      font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: #201f1e;
+    }
+    .guide ol { padding-left: 18px; }
+    .guide li { margin-bottom: 6px; line-height: 1.5; }
+    .guide code {
+      background: #edebe9; padding: 1px 5px; border-radius: 2px;
+      font-family: "Cascadia Code", Consolas, monospace; font-size: 12px;
+    }
+
+    .manifest-link {
+      display: inline-block; margin: 12px 0;
+      padding: 8px 16px; background: #0078d4; color: #fff;
+      text-decoration: none; border-radius: 2px; font-weight: 600; font-size: 13px;
+    }
+    .manifest-link:hover { background: #106ebe; }
+
+    .note {
+      background: #eff6fc; border-left: 3px solid #0078d4;
+      padding: 8px 12px; margin-top: 12px; font-size: 12px; color: #323130;
+      border-radius: 0 2px 2px 0;
+    }
+
+    @media (max-width: 600px) {
+      .preview-wrap { flex: 0 0 100%; }
+    }
+  </style>
 </head>
 <body>
-  <h1>EnfoldedOrichalcum</h1>
+
+<header>
+  <h1>Email Triage Add-in</h1>
+  <p>Outlook task pane add-in — development testbed hosted on GitHub Pages</p>
+</header>
+
+<div class="layout">
+
+  <!-- ── Live browser preview ── -->
+  <div class="preview-wrap">
+    <div class="preview-badge">Browser Preview</div>
+    <div class="preview-frame">
+
+      <h2>Email</h2>
+      <div class="field">
+        <label for="from">From</label>
+        <input type="text" id="from" readonly value="sender@example.com"/>
+      </div>
+      <div class="field">
+        <label for="subject">Subject</label>
+        <input type="text" id="subject" readonly value="[PREVIEW] Sample Email Subject"/>
+      </div>
+
+      <h2>Triage</h2>
+      <div class="field">
+        <label for="f-reference">Reference</label>
+        <input type="text" id="f-reference" value="[PREVIEW] Sample Email Subject"/>
+      </div>
+      <div class="field">
+        <label for="f-category">Category</label>
+        <input type="text" id="f-category" placeholder="e.g. Support / Sales / Finance"/>
+      </div>
+      <div class="field">
+        <label for="f-priority">Priority</label>
+        <input type="text" id="f-priority" placeholder="e.g. High / Medium / Low"/>
+      </div>
+      <div class="field">
+        <label for="f-owner">Owner</label>
+        <input type="text" id="f-owner" placeholder="assignee name or alias"/>
+      </div>
+      <div class="field">
+        <label for="f-notes">Notes</label>
+        <input type="text" id="f-notes" placeholder="free-form notes"/>
+      </div>
+      <div class="field">
+        <label for="f-country">Country</label>
+        <select id="f-country"></select>
+      </div>
+      <div class="field">
+        <label for="f-year">Year</label>
+        <select id="f-year"></select>
+      </div>
+      <div class="field">
+        <label for="f-quarter">Quarter</label>
+        <select id="f-quarter">
+          <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+        </select>
+      </div>
+
+      <button class="copy-btn" id="copy-btn">Copy to Clipboard</button>
+      <div id="status" class="status"></div>
+
+    </div><!-- /.preview-frame -->
+  </div><!-- /.preview-wrap -->
+
+  <!-- ── Install guide ── -->
+  <div class="guide">
+    <h2>Install the Add-in</h2>
+
+    <a class="manifest-link" href="manifest.xml" download="manifest.xml">
+      Download manifest.xml
+    </a>
+
+    <h3>Outlook on the Web</h3>
+    <ol>
+      <li>Open <strong>Outlook on the Web</strong> and sign in with your Microsoft account.</li>
+      <li>Click the <strong>gear icon</strong> (Settings) → <em>Manage Add-ins</em>.</li>
+      <li>Scroll to <em>Custom Add-ins</em> → click <strong>Add a custom add-in</strong>.</li>
+      <li>Choose <strong>Add from URL</strong> and paste:<br/>
+        <code>https://rpapub.github.io/EnfoldedOrichalcum/manifest.xml</code>
+      </li>
+      <li>Confirm any prompts. The add-in will appear in your toolbar.</li>
+    </ol>
+
+    <h3>Outlook Desktop (Windows)</h3>
+    <ol>
+      <li>Download <code>manifest.xml</code> using the button above.</li>
+      <li>Open Outlook → <strong>File</strong> → <em>Manage Add-ins</em>.<br/>
+        (This opens Outlook on the Web — follow the web steps from step 3.)</li>
+    </ol>
+
+    <h3>New Outlook on Windows</h3>
+    <ol>
+      <li>Open <strong>New Outlook</strong> → click <strong>…</strong> (More apps) in the toolbar.</li>
+      <li>Select <em>Add apps</em> → <em>Manage your add-ins</em>.</li>
+      <li>Under <em>Custom Add-ins</em>, choose <strong>Add from URL</strong> and paste the manifest URL above.</li>
+    </ol>
+
+    <h3>Using the Add-in</h3>
+    <ol>
+      <li>Open any email in Outlook.</li>
+      <li>Click <strong>Triage Email</strong> in the ribbon.</li>
+      <li>Fill in the triage fields (Reference is pre-filled from the subject).</li>
+      <li>Click <strong>Copy to Clipboard</strong> — a JSON object is copied.</li>
+    </ol>
+
+    <div class="note">
+      <strong>Requirements:</strong> A Microsoft account (@outlook.com, @hotmail.com, or Microsoft 365).
+      Gmail/Yahoo accounts added to Outlook desktop do not support add-ins.
+    </div>
+  </div><!-- /.guide -->
+
+</div><!-- /.layout -->
+
+<script src="taskpane.js"></script>
 </body>
 </html>
