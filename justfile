@@ -1,6 +1,9 @@
 validate:
     npx office-addin-manifest validate docs/manifest.xml
 
+triage:
+    uv run scripts/triage.py
+
 install:
     uv sync --group test
     uv run playwright install chromium

@@ -177,8 +177,8 @@ async function writeGraphExtension(token, restMessageId, data) {
 if (typeof Office !== "undefined") {
   Office.onReady(() => {
     initForm();
-    initMsal();
 
+    // Read email properties first — isolated from MSAL so auth errors can't block this
     try {
       const item = Office.context.mailbox.item;
       document.getElementById("from").value        = item.from ? item.from.emailAddress : "";
@@ -187,6 +187,8 @@ if (typeof Office !== "undefined") {
     } catch (e) {
       console.warn("Could not read email properties:", e);
     }
+
+    try { initMsal(); } catch (e) { console.warn("MSAL init failed:", e); }
 
     document.getElementById("save-btn").addEventListener("click", async () => {
       const btn = document.getElementById("save-btn");
