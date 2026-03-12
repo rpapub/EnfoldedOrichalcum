@@ -5,81 +5,122 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sign in</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
   <style>
     body {
       font-family: "Segoe UI", system-ui, sans-serif;
       display: flex; align-items: center; justify-content: center;
       height: 100vh; margin: 0; background: #faf9f8; color: #201f1e;
-      font-size: 14px;
+      font-size: 14px; text-align: center;
     }
-    .msg { text-align: center; }
-    .msg p { margin-top: 8px; color: #605e5c; font-size: 12px; }
+    #msg   { font-weight: 600; }
+    #sub   { margin-top: 8px; color: #605e5c; font-size: 12px; }
   </style>
 </head>
 <body>
-<div class="msg">
-  <strong>Signing in…</strong>
-  <p>This window will close automatically.</p>
-</div>
+  <div>
+    <div id="msg">Redirecting to sign-in…</div>
+    <div id="sub"></div>
+  </div>
+
 <script>
-  const CLIENT_ID    = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
-  const AUTHORITY    = "https://login.microsoftonline.com/common";
-  const GRAPH_SCOPES = ["Mail.ReadWrite"];
+/* Pure PKCE OAuth2 — no MSAL, no CDN dependencies */
 
-  const msalInstance = new msal.PublicClientApplication({
-    auth: {
-      clientId: CLIENT_ID,
-      authority: AUTHORITY,
-      redirectUri: window.location.href.split("?")[0]
-    },
-    cache: { cacheLocation: "sessionStorage" }
-  });
+const CLIENT_ID    = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
+const TENANT       = "common";
+const REDIRECT_URI = "https://rpapub.github.io/EnfoldedOrichalcum/auth-dialog.html";
+const SCOPES       = "Mail.ReadWrite openid profile";
 
-  async function run() {
-    // Handle redirect response first (fires on second load after redirect)
-    const redirectResult = await msalInstance.handleRedirectPromise().catch(() => null);
-    if (redirectResult) {
-      sendTokenToTaskpane(redirectResult.accessToken);
-      return;
+function setMsg(msg, sub) {
+  document.getElementById("msg").textContent = msg;
+  document.getElementById("sub").textContent = sub || "";
+}
+
+function sendToTaskpane(payload) {
+  Office.onReady(() => Office.context.ui.messageParent(JSON.stringify(payload)));
+}
+
+// ── PKCE helpers ──────────────────────────────────────────────────────────────
+function base64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+async function generatePKCE() {
+  const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = base64url(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))
+  );
+  return { verifier, challenge };
+}
+
+// ── Token exchange ─────────────────────────────────────────────────────────────
+async function exchangeCode(code, verifier) {
+  const resp = await fetch(
+    `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id:     CLIENT_ID,
+        grant_type:    "authorization_code",
+        code,
+        redirect_uri:  REDIRECT_URI,
+        code_verifier: verifier,
+        scope:         SCOPES,
+      }),
     }
+  );
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error_description || data.error || "Token exchange failed");
+  return data.access_token;
+}
 
-    // First load — trigger login
-    const accounts = msalInstance.getAllAccounts();
-    try {
-      let result;
-      if (accounts.length > 0) {
-        result = await msalInstance.acquireTokenSilent({
-          scopes: GRAPH_SCOPES,
-          account: accounts[0]
-        });
-      } else {
-        result = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES });
-      }
-      sendTokenToTaskpane(result.accessToken);
-    } catch (e) {
-      // Popup blocked inside Office dialog — fall back to redirect
-      if (e.errorCode === "popup_window_error" || e.errorCode === "empty_window_error") {
-        msalInstance.acquireTokenRedirect({ scopes: GRAPH_SCOPES });
-      } else {
-        sendError(e.message || "Authentication failed");
-      }
-    }
+// ── Main flow ─────────────────────────────────────────────────────────────────
+async function run() {
+  const params = new URLSearchParams(window.location.search);
+  const code   = params.get("code");
+  const error  = params.get("error");
+
+  if (error) {
+    throw new Error(params.get("error_description") || error);
   }
 
-  function sendTokenToTaskpane(accessToken) {
-    Office.onReady(() => {
-      Office.context.ui.messageParent(JSON.stringify({ accessToken }));
-    });
+  if (code) {
+    // Second load — came back from Microsoft with auth code
+    setMsg("Signing in…", "Exchanging authorization code.");
+    const verifier = sessionStorage.getItem("pkce_verifier");
+    if (!verifier) throw new Error("PKCE verifier missing — please try again.");
+    sessionStorage.removeItem("pkce_verifier");
+
+    const accessToken = await exchangeCode(code, verifier);
+    setMsg("Signed in.", "Returning to add-in…");
+    sendToTaskpane({ accessToken });
+    return;
   }
 
-  function sendError(error) {
-    Office.onReady(() => {
-      Office.context.ui.messageParent(JSON.stringify({ error }));
-    });
-  }
+  // First load — start PKCE flow
+  const { verifier, challenge } = await generatePKCE();
+  sessionStorage.setItem("pkce_verifier", verifier);
 
-  run();
+  const authUrl = new URL(
+    `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/authorize`
+  );
+  authUrl.searchParams.set("client_id",             CLIENT_ID);
+  authUrl.searchParams.set("response_type",         "code");
+  authUrl.searchParams.set("redirect_uri",          REDIRECT_URI);
+  authUrl.searchParams.set("scope",                 SCOPES);
+  authUrl.searchParams.set("code_challenge",        challenge);
+  authUrl.searchParams.set("code_challenge_method", "S256");
+  authUrl.searchParams.set("response_mode",         "query");
+
+  setMsg("Redirecting…", "Opening Microsoft sign-in.");
+  window.location.replace(authUrl.toString());
+}
+
+run().catch(e => {
+  setMsg("Sign-in failed.", e.message || String(e));
+  sendToTaskpane({ error: e.message || "Authentication failed" });
+});
 </script>
 </body>
 </html>

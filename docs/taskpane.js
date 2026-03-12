@@ -106,7 +106,8 @@ function getTokenViaDialog() {
           }
         });
         dialog.addEventHandler(Office.EventType.DialogEventReceived, (evt) => {
-          if (evt.error === 12006) reject(new Error("Auth dialog closed by user."));
+          // 12006 = user closed dialog; ignore during redirect cycle (fires on navigation away)
+          if (evt.error === 12006) reject(new Error("Sign-in cancelled."));
         });
       }
     );
@@ -155,6 +156,7 @@ if (typeof Office !== "undefined") {
       document.getElementById("from").value        = item.from ? item.from.emailAddress : "";
       document.getElementById("subject").value     = item.subject || "";
       document.getElementById("f-reference").value = item.subject || "";
+      document.getElementById("message-id").value  = item.itemId || "";
     } catch (e) {
       console.warn("Could not read email properties:", e);
     }
