@@ -84,7 +84,7 @@ function initMsal() {
     auth: {
       clientId: CLIENT_ID,
       authority: AUTHORITY,
-      redirectUri: window.location.origin + window.location.pathname
+      redirectUri: "https://rpapub.github.io/EnfoldedOrichalcum/taskpane.html"
     },
     cache: { cacheLocation: "sessionStorage" }
   });
@@ -188,7 +188,12 @@ if (typeof Office !== "undefined") {
       console.warn("Could not read email properties:", e);
     }
 
-    try { initMsal(); } catch (e) { console.warn("MSAL init failed:", e); }
+    try {
+      initMsal();
+    } catch (e) {
+      console.error("MSAL init failed:", e);
+      showStatus("Auth setup failed — check console.", true);
+    }
 
     document.getElementById("save-btn").addEventListener("click", async () => {
       const btn = document.getElementById("save-btn");
