@@ -102,7 +102,13 @@
 </head>
 <body>
 
-  <div class="brand-bar">v0.1.0</div>
+  <div class="brand-bar" id="brand-bar">v0.1.0</div>
+  <script>
+    (function(){
+      var t=["embed · enrich · automate","structured data, right on the message","tag it. route it. automate it.","from inbox to workflow","data in. noise out.","triage once. query forever.","attach meaning to your mail"];
+      document.getElementById("brand-bar").textContent=t[new Date().getHours()%t.length];
+    })();
+  </script>
 
   <div class="form-body">
 
