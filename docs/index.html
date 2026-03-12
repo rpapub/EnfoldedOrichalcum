@@ -244,7 +244,7 @@
     <h3>Step 1 — Register an Azure AD App</h3>
     <ol>
       <li>Go to <strong>portal.azure.com</strong> → <em>Azure Active Directory</em> → <em>App registrations</em> → <strong>New registration</strong>.</li>
-      <li>Name: <code>Email Triage Add-in</code></li>
+      <li>Name: <code>RPA Embed Data</code></li>
       <li>Supported account types: <em>Accounts in any organizational directory and personal Microsoft accounts</em>.</li>
       <li>Redirect URI: choose <strong>Single-page application (SPA)</strong> and add:<br/>
         <code>https://rpapub.github.io/EnfoldedOrichalcum/taskpane.html</code>
@@ -253,14 +253,7 @@
       <li>Go to <em>API permissions</em> → <strong>Add a permission</strong> → Microsoft Graph → Delegated → <code>Mail.ReadWrite</code>. Grant admin consent if required.</li>
     </ol>
 
-    <h3>Step 2 — Set Your Client ID</h3>
-    <ol>
-      <li>Open <code>docs/taskpane.js</code> in this repository.</li>
-      <li>Replace <code>REPLACE_WITH_YOUR_CLIENT_ID</code> with the ID copied above.</li>
-      <li>Commit and push — GitHub Pages will redeploy automatically.</li>
-    </ol>
-
-    <h3>Step 3 — Install the Add-in</h3>
+    <h3>Step 2 — Install the Add-in</h3>
 
     <a class="manifest-link" href="manifest.xml" download="manifest.xml">
       Download manifest.xml

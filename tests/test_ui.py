@@ -23,7 +23,7 @@ def testbed(browser):
 
 
 def test_testbed_title(testbed):
-    expect(testbed).to_have_title(re.compile("Email Triage", re.IGNORECASE))
+    expect(testbed).to_have_title(re.compile("RPA Embed Data", re.IGNORECASE))
 
 
 def test_testbed_form_fields_present(testbed):
