@@ -3,7 +3,7 @@
 // ── Configuration ─────────────────────────────────────────────────────────────
 // Replace CLIENT_ID with your Azure AD Application (client) ID.
 // See the setup guide at https://rpapub.github.io/EnfoldedOrichalcum/
-const CLIENT_ID      = "REPLACE_WITH_YOUR_CLIENT_ID";
+const CLIENT_ID      = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
 const AUTHORITY      = "https://login.microsoftonline.com/common";
 const GRAPH_SCOPES   = ["Mail.ReadWrite"];
 const EXTENSION_NAME = "com.rpapub.emailtriage";
