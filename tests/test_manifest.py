@@ -90,7 +90,7 @@ def test_extension_name_in_taskpane_js():
     """Extension name in taskpane.js must be a valid reverse-domain string."""
     js = (Path(__file__).parent.parent / "docs" / "taskpane.js").read_text()
     assert 'EXTENSION_NAME' in js
-    assert '"com.rpapub.emailtriage"' in js
+    assert '"net.cprima.rpapub.EnfoldedOrichalcum"' in js
 
 
 def test_client_id_is_set():

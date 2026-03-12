@@ -25,7 +25,7 @@ import requests
 CLIENT_ID      = "f28629c6-2f87-4afc-a6ff-1cbbd50166af"
 AUTHORITY      = "https://login.microsoftonline.com/common"
 SCOPES         = ["Mail.ReadWrite"]
-EXTENSION_NAME = "com.rpapub.emailtriage"
+EXTENSION_NAME = "net.cprima.rpapub.EnfoldedOrichalcum"
 REDIRECT_URI   = "http://localhost"
 
 COUNTRIES = [

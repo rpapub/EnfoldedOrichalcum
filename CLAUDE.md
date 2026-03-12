@@ -48,7 +48,7 @@ Before opening the auth dialog, the task pane serializes form fields to `localSt
 
 ### Graph open extension
 
-Triage data is written as `microsoft.graph.openTypeExtension` named `com.rpapub.emailtriage` on the message resource. Write is a POST; if the extension already exists (409), it falls back to PATCH. Read-back uses `$filter=extensions/any(f:f/id eq 'com.rpapub.emailtriage')` with `$expand` — this is also how the Python CLI queries tagged messages, because direct `/messages/{id}/extensions/...` URLs fail for EWS IDs that contain `/` characters.
+Triage data is written as `microsoft.graph.openTypeExtension` named `net.cprima.rpapub.EnfoldedOrichalcum` on the message resource. Write is a POST; if the extension already exists (409), it falls back to PATCH. Read-back uses `$filter=extensions/any(f:f/id eq 'net.cprima.rpapub.EnfoldedOrichalcum')` with `$expand` — this is also how the Python CLI queries tagged messages, because direct `/messages/{id}/extensions/...` URLs fail for EWS IDs that contain `/` characters.
 
 ### Message ID formats
 
@@ -84,7 +84,7 @@ Uses MSAL Python (`acquire_token_interactive`) with `http://localhost` redirect 
 | Constant | Location | Value |
 |---|---|---|
 | `CLIENT_ID` | `taskpane.js`, `auth-dialog.html`, `scripts/triage.py` | `f28629c6-2f87-4afc-a6ff-1cbbd50166af` |
-| `EXTENSION_NAME` | same | `com.rpapub.emailtriage` |
+| `EXTENSION_NAME` | same | `net.cprima.rpapub.EnfoldedOrichalcum` |
 | `REDIRECT_URI` | `auth-dialog.html` | `https://rpapub.github.io/EnfoldedOrichalcum/auth-dialog.html` |
 
 ## Deployment

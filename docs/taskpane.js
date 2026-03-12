@@ -4,7 +4,7 @@
 const CLIENT_ID      = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
 const AUTHORITY      = "https://login.microsoftonline.com/common";
 const GRAPH_SCOPES   = ["Mail.ReadWrite"];
-const EXTENSION_NAME = "com.rpapub.emailtriage";
+const EXTENSION_NAME = "net.cprima.rpapub.EnfoldedOrichalcum";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const COUNTRIES = [
