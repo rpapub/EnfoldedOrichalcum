@@ -2,7 +2,7 @@ validate:
     npx office-addin-manifest validate docs/manifest.xml
 
 triage:
-    BROWSER=explorer.exe uv run scripts/triage.py
+    BROWSER="/mnt/c/Program Files/Mozilla Firefox/firefox.exe" uv run scripts/triage.py
 
 install:
     uv sync --group test
