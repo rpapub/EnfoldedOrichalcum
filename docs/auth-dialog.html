@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sign in</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; margin: 0; background: #faf9f8; color: #201f1e;
+      font-size: 14px;
+    }
+    .msg { text-align: center; }
+    .msg p { margin-top: 8px; color: #605e5c; font-size: 12px; }
+  </style>
+</head>
+<body>
+<div class="msg">
+  <strong>Signing in…</strong>
+  <p>This window will close automatically.</p>
+</div>
+<script>
+  const CLIENT_ID    = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
+  const AUTHORITY    = "https://login.microsoftonline.com/common";
+  const GRAPH_SCOPES = ["Mail.ReadWrite"];
+
+  const msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: AUTHORITY,
+      redirectUri: window.location.href.split("?")[0]
+    },
+    cache: { cacheLocation: "sessionStorage" }
+  });
+
+  async function run() {
+    // Handle redirect response first (fires on second load after redirect)
+    const redirectResult = await msalInstance.handleRedirectPromise().catch(() => null);
+    if (redirectResult) {
+      sendTokenToTaskpane(redirectResult.accessToken);
+      return;
+    }
+
+    // First load — trigger login
+    const accounts = msalInstance.getAllAccounts();
+    try {
+      let result;
+      if (accounts.length > 0) {
+        result = await msalInstance.acquireTokenSilent({
+          scopes: GRAPH_SCOPES,
+          account: accounts[0]
+        });
+      } else {
+        result = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES });
+      }
+      sendTokenToTaskpane(result.accessToken);
+    } catch (e) {
+      // Popup blocked inside Office dialog — fall back to redirect
+      if (e.errorCode === "popup_window_error" || e.errorCode === "empty_window_error") {
+        msalInstance.acquireTokenRedirect({ scopes: GRAPH_SCOPES });
+      } else {
+        sendError(e.message || "Authentication failed");
+      }
+    }
+  }
+
+  function sendTokenToTaskpane(accessToken) {
+    Office.onReady(() => {
+      Office.context.ui.messageParent(JSON.stringify({ accessToken }));
+    });
+  }
+
+  function sendError(error) {
+    Office.onReady(() => {
+      Office.context.ui.messageParent(JSON.stringify({ error }));
+    });
+  }
+
+  run();
+</script>
+</body>
+</html>

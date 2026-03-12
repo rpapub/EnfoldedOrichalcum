@@ -1,8 +1,6 @@
 /* global Office, msal */
 
 // ── Configuration ─────────────────────────────────────────────────────────────
-// Replace CLIENT_ID with your Azure AD Application (client) ID.
-// See the setup guide at https://rpapub.github.io/EnfoldedOrichalcum/
 const CLIENT_ID      = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
 const AUTHORITY      = "https://login.microsoftonline.com/common";
 const GRAPH_SCOPES   = ["Mail.ReadWrite"];
@@ -45,7 +43,7 @@ function populateYears(selectId) {
 }
 
 function autoSelectQuarter(selectId) {
-  const month = new Date().getMonth(); // 0-based
+  const month = new Date().getMonth();
   const q = Math.floor(month / 3) + 1;
   document.getElementById(selectId).value = `Q${q}`;
 }
@@ -78,7 +76,7 @@ function showStatus(msg, isError) {
   if (!isError) setTimeout(() => { el.textContent = ""; el.className = "status"; }, 4000);
 }
 
-// ── MSAL ──────────────────────────────────────────────────────────────────────
+// ── MSAL (silent only — popup is blocked inside Outlook task panes) ───────────
 let msalInstance = null;
 
 function initMsal() {
@@ -92,19 +90,60 @@ function initMsal() {
   });
 }
 
-async function getToken() {
+async function getTokenSilent() {
   const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    try {
-      const result = await msalInstance.acquireTokenSilent({
-        scopes: GRAPH_SCOPES,
-        account: accounts[0]
-      });
-      return result.accessToken;
-    } catch (_) { /* fall through to popup */ }
+  if (accounts.length === 0) return null;
+  try {
+    const result = await msalInstance.acquireTokenSilent({
+      scopes: GRAPH_SCOPES,
+      account: accounts[0]
+    });
+    return result.accessToken;
+  } catch (_) {
+    return null;
   }
-  const result = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES });
-  return result.accessToken;
+}
+
+// ── Office Dialog API auth ────────────────────────────────────────────────────
+// Outlook task panes block window.open (MSAL popup), so we use Office Dialog.
+// The auth-dialog.html page handles the MSAL redirect flow and posts the token back.
+function getTokenViaDialog() {
+  return new Promise((resolve, reject) => {
+    const dialogUrl =
+      window.location.origin +
+      window.location.pathname.replace("taskpane.html", "auth-dialog.html");
+
+    Office.context.ui.displayDialogAsync(
+      dialogUrl,
+      { height: 60, width: 30, promptBeforeOpen: false },
+      (result) => {
+        if (result.status === Office.AsyncResultStatus.Failed) {
+          reject(new Error(`Dialog failed: ${result.error.message}`));
+          return;
+        }
+        const dialog = result.value;
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (msg) => {
+          dialog.close();
+          try {
+            const payload = JSON.parse(msg.message);
+            if (payload.error) reject(new Error(payload.error));
+            else resolve(payload.accessToken);
+          } catch (e) {
+            reject(new Error("Invalid message from auth dialog"));
+          }
+        });
+        dialog.addEventHandler(Office.EventType.DialogEventReceived, (evt) => {
+          if (evt.error === 12006) reject(new Error("Auth dialog closed by user."));
+        });
+      }
+    );
+  });
+}
+
+async function getToken() {
+  const silent = await getTokenSilent();
+  if (silent) return silent;
+  return getTokenViaDialog();
 }
 
 // ── Graph API ─────────────────────────────────────────────────────────────────
@@ -123,11 +162,8 @@ async function writeGraphExtension(token, restMessageId, data) {
   let res = await fetch(baseUrl, { method: "POST", headers, body });
 
   if (res.status === 409) {
-    // Extension already exists on this message — update it
     res = await fetch(`${baseUrl}/${EXTENSION_NAME}`, { method: "PATCH", headers, body });
-    if (res.status !== 204) {
-      throw new Error(`Extension update failed: ${res.status}`);
-    }
+    if (res.status !== 204) throw new Error(`Extension update failed: ${res.status}`);
     return;
   }
 
@@ -139,35 +175,39 @@ async function writeGraphExtension(token, restMessageId, data) {
 
 // ── Outlook (Office.js) path ──────────────────────────────────────────────────
 if (typeof Office !== "undefined") {
-  Office.onReady((info) => {
-    if (info.host === Office.HostType.Outlook) {
-      initForm();
-      initMsal();
+  Office.onReady(() => {
+    initForm();
+    initMsal();
+
+    try {
       const item = Office.context.mailbox.item;
       document.getElementById("from").value        = item.from ? item.from.emailAddress : "";
       document.getElementById("subject").value     = item.subject || "";
       document.getElementById("f-reference").value = item.subject || "";
-
-      document.getElementById("save-btn").addEventListener("click", async () => {
-        const btn = document.getElementById("save-btn");
-        btn.disabled = true;
-        showStatus("Saving…", false);
-        try {
-          const token = await getToken();
-          const restId = Office.context.mailbox.convertToRestId(
-            item.itemId,
-            Office.MailboxEnums.RestVersion.v2_0
-          );
-          await writeGraphExtension(token, restId, buildOutput());
-          showStatus("Saved to message extension.", false);
-        } catch (e) {
-          showStatus(e.message || "Save failed.", true);
-          console.error(e);
-        } finally {
-          btn.disabled = false;
-        }
-      });
+    } catch (e) {
+      console.warn("Could not read email properties:", e);
     }
+
+    document.getElementById("save-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("save-btn");
+      btn.disabled = true;
+      showStatus("Authenticating…", false);
+      try {
+        const token = await getToken();
+        showStatus("Saving…", false);
+        const restId = Office.context.mailbox.convertToRestId(
+          Office.context.mailbox.item.itemId,
+          Office.MailboxEnums.RestVersion.v2_0
+        );
+        await writeGraphExtension(token, restId, buildOutput());
+        showStatus("Saved to message extension.", false);
+      } catch (e) {
+        showStatus(e.message || "Save failed.", true);
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
   });
 } else {
   // ── Browser preview / testbed path ───────────────────────────────────────────
