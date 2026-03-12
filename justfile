@@ -5,6 +5,10 @@ triage:
     #!/usr/bin/env bash
     exec env BROWSER="/mnt/c/Program Files/Mozilla Firefox/firefox.exe" uv run scripts/triage.py
 
+check mid:
+    #!/usr/bin/env bash
+    exec env BROWSER="/mnt/c/Program Files/Mozilla Firefox/firefox.exe" uv run scripts/triage.py --check --message-id "{{mid}}"
+
 install:
     uv sync --group test
     uv run playwright install chromium

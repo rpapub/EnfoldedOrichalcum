@@ -4,6 +4,7 @@ Email Triage CLI — authenticates via browser and writes a Graph open extension
 Usage:
     uv run scripts/triage.py                        # interactive prompts
     uv run scripts/triage.py --message-id <id>      # skip message ID prompt
+    uv run scripts/triage.py --check --message-id <id>  # read back extension
 
 Azure AD prerequisite
 ─────────────────────
@@ -16,6 +17,7 @@ import argparse
 import json
 import sys
 import webbrowser
+from urllib.parse import quote
 
 import msal
 import requests
@@ -71,15 +73,44 @@ def list_recent_messages(token: str, count: int = 10) -> list[dict]:
     return resp.json().get("value", [])
 
 
+def find_triaged_messages(token: str) -> list[dict]:
+    """Return all messages that have our triage extension."""
+    resp = requests.get(
+        "https://graph.microsoft.com/v1.0/me/messages",
+        headers={"Authorization": f"Bearer {token}"},
+        params={
+            "$filter": f"extensions/any(f:f/id eq '{EXTENSION_NAME}')",
+            "$expand": f"extensions($filter=id eq '{EXTENSION_NAME}')",
+            "$select": "id,subject,from,receivedDateTime",
+            "$top": 25,
+        },
+    )
+    resp.raise_for_status()
+    return resp.json().get("value", [])
+
+
+def _msg_url(message_id: str) -> str:
+    return f"https://graph.microsoft.com/v1.0/me/messages/{quote(message_id, safe='')}"
+
+
+def read_extension(token: str, message_id: str) -> dict | None:
+    url  = f"{_msg_url(message_id)}/extensions/{EXTENSION_NAME}"
+    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()
+
+
 def write_extension(token: str, message_id: str, data: dict) -> None:
-    url  = f"https://graph.microsoft.com/v1.0/me/messages/{message_id}/extensions"
+    url  = f"{_msg_url(message_id)}/extensions"
     body = {"@odata.type": "microsoft.graph.openTypeExtension", "extensionName": EXTENSION_NAME, **data}
     hdrs = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     resp = requests.post(url, headers=hdrs, json=body)
 
     if resp.status_code == 409:
-        resp = requests.patch(f"{url}/{EXTENSION_NAME}", headers=hdrs, json=body)
+        resp = requests.patch(f"{_msg_url(message_id)}/extensions/{EXTENSION_NAME}", headers=hdrs, json=body)
         if resp.status_code not in (200, 204):
             resp.raise_for_status()
         print("Extension updated.")
@@ -166,11 +197,30 @@ def pick_quarter() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Email Triage CLI")
     parser.add_argument("--message-id", help="Graph message ID (skip interactive selection)")
+    parser.add_argument("--check", action="store_true", help="Read back the extension instead of writing")
     args = parser.parse_args()
 
     token = get_token()
 
-    message_id = args.message_id or pick_message(token)
+    if args.check:
+        print("Searching for messages with triage extension…")
+        messages = find_triaged_messages(token)
+        if not messages:
+            print("\nNo triaged messages found.")
+        else:
+            print(f"\nFound {len(messages)} triaged message(s):\n")
+            for m in messages:
+                sender = m.get("from", {}).get("emailAddress", {}).get("address", "?")
+                ext    = (m.get("extensions") or [{}])[0]
+                print(f"  Subject : {m['subject']}")
+                print(f"  From    : {sender}")
+                print(f"  Received: {m['receivedDateTime']}")
+                print(f"  Triage  : {json.dumps({k: v for k, v in ext.items() if not k.startswith('@') and k != 'id'}, indent=12)}")
+                print()
+        return
+
+    raw_id     = args.message_id or pick_message(token)
+    message_id = raw_id
 
     print("\nTriage fields (press Enter to accept default):\n")
     data = {
