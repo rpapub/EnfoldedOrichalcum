@@ -72,7 +72,7 @@ async function exchangeCode(code, verifier) {
   );
   const data = await resp.json();
   if (!resp.ok) throw new Error(data.error_description || data.error || "Token exchange failed");
-  return data.access_token;
+  return { accessToken: data.access_token, expiresIn: data.expires_in ?? 3600 };
 }
 
 // ── Main flow ─────────────────────────────────────────────────────────────────
@@ -92,9 +92,9 @@ async function run() {
     if (!verifier) throw new Error("PKCE verifier missing — please try again.");
     sessionStorage.removeItem("pkce_verifier");
 
-    const accessToken = await exchangeCode(code, verifier);
+    const { accessToken, expiresIn } = await exchangeCode(code, verifier);
     setMsg("Signed in.", "Returning to add-in…");
-    sendToTaskpane({ accessToken });
+    sendToTaskpane({ accessToken, expiresIn });
     return;
   }
 

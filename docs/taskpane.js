@@ -76,6 +76,24 @@ function showStatus(msg, isError) {
   if (!isError) setTimeout(() => { el.textContent = ""; el.className = "status"; }, 4000);
 }
 
+// ── Token cache ───────────────────────────────────────────────────────────────
+const TOKEN_KEY = "triage_token_cache";
+
+function getCachedToken() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(TOKEN_KEY) || "null");
+    if (cached && cached.expiresAt > Date.now() + 60_000) return cached.accessToken;
+  } catch (_) {}
+  return null;
+}
+
+function cacheToken(accessToken, expiresIn) {
+  localStorage.setItem(TOKEN_KEY, JSON.stringify({
+    accessToken,
+    expiresAt: Date.now() + expiresIn * 1000
+  }));
+}
+
 // ── Auth via Office Dialog ────────────────────────────────────────────────────
 // MSAL is NOT loaded in the taskpane (blocked by Edge Tracking Prevention).
 // Auth runs entirely inside auth-dialog.html, a real browser window, which
@@ -100,7 +118,10 @@ function getTokenViaDialog() {
           try {
             const payload = JSON.parse(msg.message);
             if (payload.error) reject(new Error(payload.error));
-            else resolve(payload.accessToken);
+            else {
+              cacheToken(payload.accessToken, payload.expiresIn ?? 3600);
+              resolve(payload.accessToken);
+            }
           } catch (e) {
             reject(new Error("Invalid message from auth dialog"));
           }
@@ -115,6 +136,8 @@ function getTokenViaDialog() {
 }
 
 async function getToken() {
+  const cached = getCachedToken();
+  if (cached) return cached;
   return getTokenViaDialog();
 }
 
