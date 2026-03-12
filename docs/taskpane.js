@@ -145,12 +145,33 @@ async function writeGraphExtension(token, restMessageId, data) {
   }
 }
 
+const FORM_STORAGE_KEY = "triage_pending_form";
+
+function saveFormToStorage() {
+  localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(buildOutput()));
+}
+
+function restoreFormFromStorage() {
+  const raw = localStorage.getItem(FORM_STORAGE_KEY);
+  if (!raw) return false;
+  try {
+    const d = JSON.parse(raw);
+    ["f-reference","f-category","f-priority","f-owner","f-notes"].forEach(id => {
+      if (d[id.replace("f-","")] !== undefined)
+        document.getElementById(id).value = d[id.replace("f-","")];
+    });
+    if (d.country) document.getElementById("f-country").value = d.country;
+    if (d.year)    document.getElementById("f-year").value    = d.year;
+    if (d.quarter) document.getElementById("f-quarter").value = d.quarter;
+    return true;
+  } catch (_) { return false; }
+}
+
 // ── Outlook (Office.js) path ──────────────────────────────────────────────────
 if (typeof Office !== "undefined") {
   Office.onReady(() => {
     initForm();
 
-    // Read email properties first — isolated from MSAL so auth errors can't block this
     try {
       const item = Office.context.mailbox.item;
       document.getElementById("from").value        = item.from ? item.from.emailAddress : "";
@@ -161,18 +182,25 @@ if (typeof Office !== "undefined") {
       console.warn("Could not read email properties:", e);
     }
 
+    // Restore any form data saved before the auth redirect reloaded the task pane
+    restoreFormFromStorage();
+
     document.getElementById("save-btn").addEventListener("click", async () => {
       const btn = document.getElementById("save-btn");
       btn.disabled = true;
       showStatus("Authenticating…", false);
+      // Persist form before auth dialog (redirect may reload task pane)
+      saveFormToStorage();
       try {
         const token = await getToken();
         showStatus("Saving…", false);
+        const data = buildOutput();
+        localStorage.removeItem(FORM_STORAGE_KEY);
         const restId = Office.context.mailbox.convertToRestId(
           Office.context.mailbox.item.itemId,
           Office.MailboxEnums.RestVersion.v2_0
         );
-        await writeGraphExtension(token, restId, buildOutput());
+        await writeGraphExtension(token, restId, data);
         showStatus("Saved to message extension.", false);
       } catch (e) {
         showStatus(e.message || "Save failed.", true);
