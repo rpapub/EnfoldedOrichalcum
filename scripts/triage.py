@@ -91,9 +91,24 @@ def write_extension(token: str, message_id: str, data: dict) -> None:
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
+_tty = None
+
+def tty_input(prompt: str) -> str:
+    """Read from /dev/tty directly — works even when stdin is closed by the caller (e.g. just)."""
+    global _tty
+    if _tty is None:
+        _tty = open("/dev/tty", "r")
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    line = _tty.readline()
+    if not line:
+        raise EOFError("No input from terminal")
+    return line.rstrip("\n")
+
+
 def prompt(label: str, default: str = "") -> str:
     hint = f" [{default}]" if default else ""
-    val = input(f"  {label}{hint}: ").strip()
+    val = tty_input(f"  {label}{hint}: ").strip()
     return val or default
 
 
@@ -110,7 +125,7 @@ def pick_message(token: str) -> str:
         print(f"  {i:2}. {m['subject'][:60]:<60}  <{sender}>")
 
     while True:
-        raw = input("\nSelect message number: ").strip()
+        raw = tty_input("\nSelect message number: ").strip()
         if raw.isdigit() and 1 <= int(raw) <= len(messages):
             return messages[int(raw) - 1]["id"]
         print("  Invalid selection.")
@@ -119,7 +134,7 @@ def pick_message(token: str) -> str:
 def pick_country() -> str:
     print("\n  Countries:", "  ".join(COUNTRIES))
     while True:
-        val = input("  Country (3-letter code): ").strip().upper()
+        val = tty_input("  Country (3-letter code): ").strip().upper()
         if val in COUNTRIES:
             return val
         print(f"  Unknown code. Choose from the list above.")
@@ -130,7 +145,7 @@ def pick_year() -> str:
     current = date.today().year
     years   = [str(y) for y in range(current, current - 6, -1)]
     while True:
-        val = input(f"  Year [{current}]: ").strip() or str(current)
+        val = tty_input(f"  Year [{current}]: ").strip() or str(current)
         if val in years:
             return val
         print(f"  Valid years: {', '.join(years)}")
@@ -140,7 +155,7 @@ def pick_quarter() -> str:
     from datetime import date
     current = f"Q{(date.today().month - 1) // 3 + 1}"
     while True:
-        val = input(f"  Quarter (Q1–Q4) [{current}]: ").strip().upper() or current
+        val = tty_input(f"  Quarter (Q1–Q4) [{current}]: ").strip().upper() or current
         if val in ("Q1", "Q2", "Q3", "Q4"):
             return val
         print("  Enter Q1, Q2, Q3, or Q4.")
@@ -171,7 +186,7 @@ def main() -> None:
 
     print("\nPayload:")
     print(json.dumps(data, indent=2))
-    confirm = input("\nSave to message extension? [Y/n]: ").strip().lower()
+    confirm = tty_input("\nSave to message extension? [Y/n]: ").strip().lower()
     if confirm in ("", "y", "yes"):
         write_extension(token, message_id, data)
     else:
