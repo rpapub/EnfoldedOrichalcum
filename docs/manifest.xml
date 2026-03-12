@@ -7,7 +7,7 @@
   xsi:type="MailApp">
 
   <Id>554972cc-6dc7-4e89-9a96-89edcffa7fdf</Id>
-  <Version>1.1.0.0</Version>
+  <Version>1.1.1.0</Version>
   <ProviderName>rpapub</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Email Triage"/>
