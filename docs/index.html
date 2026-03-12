@@ -82,13 +82,19 @@
     input:focus, select:focus {
       outline: none; border-color: #0078d4; box-shadow: 0 0 0 1px #0078d4;
     }
-    button.copy-btn {
+    button.save-btn {
       display: block; width: 100%; margin-top: 12px; padding: 7px;
       background: #0078d4; color: #fff; border: none; border-radius: 2px;
       font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
     }
-    button.copy-btn:hover  { background: #106ebe; }
-    button.copy-btn:active { background: #005a9e; }
+    button.save-btn:hover  { background: #106ebe; }
+    button.save-btn:active { background: #005a9e; }
+    #preview-output {
+      display: none; margin-top: 8px; padding: 8px;
+      background: #f3f2f1; border: 1px solid #edebe9; border-radius: 2px;
+      font-family: "Cascadia Code", Consolas, monospace; font-size: 11px;
+      white-space: pre; overflow-x: auto; color: #201f1e;
+    }
     .status     { min-height: 16px; margin-top: 5px; font-size: 11px; text-align: center; }
     .status.ok  { color: #107c10; }
     .status.error { color: #a4262c; }
@@ -188,7 +194,8 @@
         </select>
       </div>
 
-      <button class="copy-btn" id="copy-btn">Copy to Clipboard</button>
+      <button class="save-btn" id="save-btn">Preview Output</button>
+      <pre id="preview-output"></pre>
       <div id="status" class="status"></div>
 
     </div><!-- /.preview-frame -->
@@ -196,48 +203,57 @@
 
   <!-- ── Install guide ── -->
   <div class="guide">
-    <h2>Install the Add-in</h2>
+    <h2>Setup</h2>
+
+    <h3>Step 1 — Register an Azure AD App</h3>
+    <ol>
+      <li>Go to <strong>portal.azure.com</strong> → <em>Azure Active Directory</em> → <em>App registrations</em> → <strong>New registration</strong>.</li>
+      <li>Name: <code>Email Triage Add-in</code></li>
+      <li>Supported account types: <em>Accounts in any organizational directory and personal Microsoft accounts</em>.</li>
+      <li>Redirect URI: choose <strong>Single-page application (SPA)</strong> and add:<br/>
+        <code>https://rpapub.github.io/EnfoldedOrichalcum/taskpane.html</code>
+      </li>
+      <li>Click <strong>Register</strong>. Copy the <strong>Application (client) ID</strong>.</li>
+      <li>Go to <em>API permissions</em> → <strong>Add a permission</strong> → Microsoft Graph → Delegated → <code>Mail.ReadWrite</code>. Grant admin consent if required.</li>
+    </ol>
+
+    <h3>Step 2 — Set Your Client ID</h3>
+    <ol>
+      <li>Open <code>docs/taskpane.js</code> in this repository.</li>
+      <li>Replace <code>REPLACE_WITH_YOUR_CLIENT_ID</code> with the ID copied above.</li>
+      <li>Commit and push — GitHub Pages will redeploy automatically.</li>
+    </ol>
+
+    <h3>Step 3 — Install the Add-in</h3>
 
     <a class="manifest-link" href="manifest.xml" download="manifest.xml">
       Download manifest.xml
     </a>
 
-    <h3>Outlook on the Web</h3>
+    <p style="margin:8px 0 4px;font-weight:600;font-size:12px">Outlook on the Web</p>
     <ol>
-      <li>Open <strong>Outlook on the Web</strong> and sign in with your Microsoft account.</li>
-      <li>Click the <strong>gear icon</strong> (Settings) → <em>Manage Add-ins</em>.</li>
-      <li>Scroll to <em>Custom Add-ins</em> → click <strong>Add a custom add-in</strong>.</li>
-      <li>Choose <strong>Add from URL</strong> and paste:<br/>
-        <code>https://rpapub.github.io/EnfoldedOrichalcum/manifest.xml</code>
-      </li>
-      <li>Confirm any prompts. The add-in will appear in your toolbar.</li>
+      <li>Settings (gear) → <em>Manage Add-ins</em> → <em>Custom Add-ins</em> → <strong>Add from URL</strong>.</li>
+      <li>Paste: <code>https://rpapub.github.io/EnfoldedOrichalcum/manifest.xml</code></li>
     </ol>
 
-    <h3>Outlook Desktop (Windows)</h3>
+    <p style="margin:8px 0 4px;font-weight:600;font-size:12px">Outlook Desktop / New Outlook</p>
     <ol>
-      <li>Download <code>manifest.xml</code> using the button above.</li>
-      <li>Open Outlook → <strong>File</strong> → <em>Manage Add-ins</em>.<br/>
-        (This opens Outlook on the Web — follow the web steps from step 3.)</li>
-    </ol>
-
-    <h3>New Outlook on Windows</h3>
-    <ol>
-      <li>Open <strong>New Outlook</strong> → click <strong>…</strong> (More apps) in the toolbar.</li>
-      <li>Select <em>Add apps</em> → <em>Manage your add-ins</em>.</li>
-      <li>Under <em>Custom Add-ins</em>, choose <strong>Add from URL</strong> and paste the manifest URL above.</li>
+      <li>File → <em>Manage Add-ins</em> (opens Outlook on the Web — follow steps above).</li>
     </ol>
 
     <h3>Using the Add-in</h3>
     <ol>
-      <li>Open any email in Outlook.</li>
-      <li>Click <strong>Triage Email</strong> in the ribbon.</li>
-      <li>Fill in the triage fields (Reference is pre-filled from the subject).</li>
-      <li>Click <strong>Copy to Clipboard</strong> — a JSON object is copied.</li>
+      <li>Open any email → click <strong>Triage Email</strong> in the ribbon.</li>
+      <li>Fill in the triage fields and click <strong>Save Triage</strong>.</li>
+      <li>On first use a sign-in popup will appear — sign in with your Microsoft account.</li>
+      <li>The triage data is written as an open extension on the email message and is accessible via Microsoft Graph and Power Automate.</li>
     </ol>
 
     <div class="note">
-      <strong>Requirements:</strong> A Microsoft account (@outlook.com, @hotmail.com, or Microsoft 365).
-      Gmail/Yahoo accounts added to Outlook desktop do not support add-ins.
+      <strong>Graph extension name:</strong> <code>com.rpapub.emailtriage</code><br/>
+      Read it back via: <code>GET /v1.0/me/messages/{id}/extensions/com.rpapub.emailtriage</code><br/><br/>
+      <strong>Requirements:</strong> A Microsoft account (@outlook.com or Microsoft 365).
+      Gmail/Yahoo accounts do not support add-ins.
     </div>
   </div><!-- /.guide -->
 

@@ -1,4 +1,13 @@
-/* global Office */
+/* global Office, msal */
+
+// ── Configuration ─────────────────────────────────────────────────────────────
+// Replace CLIENT_ID with your Azure AD Application (client) ID.
+// See the setup guide at https://rpapub.github.io/EnfoldedOrichalcum/
+const CLIENT_ID      = "REPLACE_WITH_YOUR_CLIENT_ID";
+const AUTHORITY      = "https://login.microsoftonline.com/common";
+const GRAPH_SCOPES   = ["Mail.ReadWrite"];
+const EXTENSION_NAME = "com.rpapub.emailtriage";
+// ─────────────────────────────────────────────────────────────────────────────
 
 const COUNTRIES = [
   ["AUS","Australia"],["AUT","Austria"],["BEL","Belgium"],["BRA","Brazil"],
@@ -66,7 +75,66 @@ function showStatus(msg, isError) {
   const el = document.getElementById("status");
   el.textContent = msg;
   el.className = "status " + (isError ? "error" : "ok");
-  setTimeout(() => { el.textContent = ""; el.className = "status"; }, 3000);
+  if (!isError) setTimeout(() => { el.textContent = ""; el.className = "status"; }, 4000);
+}
+
+// ── MSAL ──────────────────────────────────────────────────────────────────────
+let msalInstance = null;
+
+function initMsal() {
+  msalInstance = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: AUTHORITY,
+      redirectUri: window.location.origin + window.location.pathname
+    },
+    cache: { cacheLocation: "sessionStorage" }
+  });
+}
+
+async function getToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (accounts.length > 0) {
+    try {
+      const result = await msalInstance.acquireTokenSilent({
+        scopes: GRAPH_SCOPES,
+        account: accounts[0]
+      });
+      return result.accessToken;
+    } catch (_) { /* fall through to popup */ }
+  }
+  const result = await msalInstance.acquireTokenPopup({ scopes: GRAPH_SCOPES });
+  return result.accessToken;
+}
+
+// ── Graph API ─────────────────────────────────────────────────────────────────
+async function writeGraphExtension(token, restMessageId, data) {
+  const baseUrl = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
+  const body = JSON.stringify({
+    "@odata.type": "microsoft.graph.openTypeExtension",
+    extensionName: EXTENSION_NAME,
+    ...data
+  });
+  const headers = {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json"
+  };
+
+  let res = await fetch(baseUrl, { method: "POST", headers, body });
+
+  if (res.status === 409) {
+    // Extension already exists on this message — update it
+    res = await fetch(`${baseUrl}/${EXTENSION_NAME}`, { method: "PATCH", headers, body });
+    if (res.status !== 204) {
+      throw new Error(`Extension update failed: ${res.status}`);
+    }
+    return;
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Graph API ${res.status}: ${detail}`);
+  }
 }
 
 // ── Outlook (Office.js) path ──────────────────────────────────────────────────
@@ -74,30 +142,50 @@ if (typeof Office !== "undefined") {
   Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
       initForm();
+      initMsal();
       const item = Office.context.mailbox.item;
-      document.getElementById("from").value    = item.from ? item.from.emailAddress : "";
-      document.getElementById("subject").value  = item.subject || "";
+      document.getElementById("from").value        = item.from ? item.from.emailAddress : "";
+      document.getElementById("subject").value     = item.subject || "";
       document.getElementById("f-reference").value = item.subject || "";
-      document.getElementById("copy-btn").addEventListener("click", copyToClipboard);
+
+      document.getElementById("save-btn").addEventListener("click", async () => {
+        const btn = document.getElementById("save-btn");
+        btn.disabled = true;
+        showStatus("Saving…", false);
+        try {
+          const token = await getToken();
+          const restId = Office.context.mailbox.convertToRestId(
+            item.itemId,
+            Office.MailboxEnums.RestVersion.v2_0
+          );
+          await writeGraphExtension(token, restId, buildOutput());
+          showStatus("Saved to message extension.", false);
+        } catch (e) {
+          showStatus(e.message || "Save failed.", true);
+          console.error(e);
+        } finally {
+          btn.disabled = false;
+        }
+      });
     }
   });
 } else {
   // ── Browser preview / testbed path ───────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
     initForm();
-    document.getElementById("from").value     = "sender@example.com";
-    document.getElementById("subject").value   = "[PREVIEW] Sample Email Subject";
+    document.getElementById("from").value        = "sender@example.com";
+    document.getElementById("subject").value     = "[PREVIEW] Sample Email Subject";
     document.getElementById("f-reference").value = "[PREVIEW] Sample Email Subject";
-    const btn = document.getElementById("copy-btn");
-    if (btn) btn.addEventListener("click", copyToClipboard);
-  });
-}
 
-function copyToClipboard() {
-  const data = buildOutput();
-  const text = JSON.stringify(data, null, 2);
-  navigator.clipboard.writeText(text).then(
-    () => showStatus("Copied to clipboard."),
-    () => showStatus("Clipboard unavailable — see console.", true)
-  );
+    const btn = document.getElementById("save-btn");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const out = document.getElementById("preview-output");
+        if (out) {
+          out.textContent = JSON.stringify(buildOutput(), null, 2);
+          out.style.display = "block";
+        }
+      });
+    }
+  });
 }
