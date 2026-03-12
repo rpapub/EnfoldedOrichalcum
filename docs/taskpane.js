@@ -1,4 +1,4 @@
-/* global Office, msal */
+/* global Office */
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 const CLIENT_ID      = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
@@ -76,37 +76,10 @@ function showStatus(msg, isError) {
   if (!isError) setTimeout(() => { el.textContent = ""; el.className = "status"; }, 4000);
 }
 
-// ── MSAL (silent only — popup is blocked inside Outlook task panes) ───────────
-let msalInstance = null;
-
-function initMsal() {
-  msalInstance = new msal.PublicClientApplication({
-    auth: {
-      clientId: CLIENT_ID,
-      authority: AUTHORITY,
-      redirectUri: "https://rpapub.github.io/EnfoldedOrichalcum/taskpane.html"
-    },
-    cache: { cacheLocation: "sessionStorage" }
-  });
-}
-
-async function getTokenSilent() {
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length === 0) return null;
-  try {
-    const result = await msalInstance.acquireTokenSilent({
-      scopes: GRAPH_SCOPES,
-      account: accounts[0]
-    });
-    return result.accessToken;
-  } catch (_) {
-    return null;
-  }
-}
-
-// ── Office Dialog API auth ────────────────────────────────────────────────────
-// Outlook task panes block window.open (MSAL popup), so we use Office Dialog.
-// The auth-dialog.html page handles the MSAL redirect flow and posts the token back.
+// ── Auth via Office Dialog ────────────────────────────────────────────────────
+// MSAL is NOT loaded in the taskpane (blocked by Edge Tracking Prevention).
+// Auth runs entirely inside auth-dialog.html, a real browser window, which
+// sends the token back via Office.context.ui.messageParent.
 function getTokenViaDialog() {
   return new Promise((resolve, reject) => {
     const dialogUrl =
@@ -141,8 +114,6 @@ function getTokenViaDialog() {
 }
 
 async function getToken() {
-  const silent = await getTokenSilent();
-  if (silent) return silent;
   return getTokenViaDialog();
 }
 
@@ -186,13 +157,6 @@ if (typeof Office !== "undefined") {
       document.getElementById("f-reference").value = item.subject || "";
     } catch (e) {
       console.warn("Could not read email properties:", e);
-    }
-
-    try {
-      initMsal();
-    } catch (e) {
-      console.error("MSAL init failed:", e);
-      showStatus("Auth setup failed — check console.", true);
     }
 
     document.getElementById("save-btn").addEventListener("click", async () => {
