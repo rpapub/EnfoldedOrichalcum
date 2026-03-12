@@ -2,7 +2,7 @@ validate:
     npx office-addin-manifest validate docs/manifest.xml
 
 triage:
-    uv run scripts/triage.py
+    BROWSER=explorer.exe uv run scripts/triage.py
 
 install:
     uv sync --group test

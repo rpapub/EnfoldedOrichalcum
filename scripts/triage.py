@@ -48,10 +48,7 @@ def get_token() -> str:
 
     # Interactive — opens browser
     print("Opening browser for sign-in…")
-    result = app.acquire_token_interactive(
-        scopes=SCOPES,
-        redirect_uri=REDIRECT_URI,
-    )
+    result = app.acquire_token_interactive(scopes=SCOPES)
 
     if "access_token" not in result:
         print("Authentication failed:")
