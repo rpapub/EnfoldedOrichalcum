@@ -6,17 +6,24 @@
   <title>Sign in</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <style>
+    /* Solarized Light */
     body {
       font-family: "Segoe UI", system-ui, sans-serif;
-      display: flex; align-items: center; justify-content: center;
-      height: 100vh; margin: 0; background: #faf9f8; color: #201f1e;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; margin: 0; background: #fdf6e3; color: #657b83;
       font-size: 14px; text-align: center;
     }
-    #msg   { font-weight: 600; }
-    #sub   { margin-top: 8px; color: #605e5c; font-size: 12px; }
+    .brand-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: #cb4b16; color: #fff;
+      padding: 8px 16px; font-weight: 700; font-size: 13px; letter-spacing: .04em;
+    }
+    #msg { font-weight: 700; color: #586e75; font-size: 16px; }
+    #sub { margin-top: 8px; color: #93a1a1; font-size: 12px; }
   </style>
 </head>
 <body>
+  <div class="brand-bar">RPA Embed Data</div>
   <div>
     <div id="msg">Redirecting to sign-in…</div>
     <div id="sub"></div>

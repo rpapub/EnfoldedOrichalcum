@@ -3,49 +3,77 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Email Triage</title>
+  <title>RPA Embed Data</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
   <style>
+    /* Solarized Light */
+    :root {
+      --base3:  #fdf6e3; /* main background   */
+      --base2:  #eee8d5; /* alt background    */
+      --base1:  #93a1a1; /* muted / borders   */
+      --base0:  #657b83; /* body text         */
+      --base00: #586e75; /* emphasis / labels */
+      --blue:   #268bd2;
+      --orange: #cb4b16; /* brand accent      */
+      --green:  #859900;
+      --red:    #dc322f;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: "Segoe UI", system-ui, sans-serif;
       font-size: 13px;
-      color: #201f1e;
-      background: #faf9f8;
-      padding: 12px;
+      color: var(--base0);
+      background: var(--base3);
+      padding: 0 0 12px;
     }
 
+    .brand-bar {
+      background: var(--orange);
+      color: #fff;
+      text-align: center;
+      padding: 7px 12px;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: .04em;
+      margin-bottom: 12px;
+    }
+
+    .form-body { padding: 0 12px; }
+
     h2 {
-      font-size: 14px;
-      font-weight: 600;
-      color: #0078d4;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--blue);
       margin: 12px 0 6px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid #edebe9;
+      padding-bottom: 3px;
+      border-bottom: 1px solid var(--base2);
+      text-transform: uppercase;
+      letter-spacing: .06em;
     }
     h2:first-of-type { margin-top: 0; }
 
     .field { margin-bottom: 8px; }
-    label  { display: block; font-weight: 600; margin-bottom: 2px; color: #323130; }
+    label  { display: block; font-weight: 600; margin-bottom: 2px; color: var(--base00); font-size: 12px; }
 
     input[type="text"],
     select {
       width: 100%;
       padding: 5px 8px;
-      border: 1px solid #8a8886;
+      border: 1px solid var(--base1);
       border-radius: 2px;
       font-size: 13px;
       font-family: inherit;
       background: #fff;
-      color: #201f1e;
+      color: var(--base00);
     }
-    input[readonly] { background: #f3f2f1; color: #605e5c; }
+    input[readonly] { background: var(--base2); color: var(--base1); }
 
     input:focus, select:focus {
       outline: none;
-      border-color: #0078d4;
-      box-shadow: 0 0 0 1px #0078d4;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 1px var(--blue);
     }
 
     button {
@@ -53,28 +81,29 @@
       width: 100%;
       margin-top: 14px;
       padding: 8px;
-      background: #0078d4;
+      background: var(--orange);
       color: #fff;
       border: none;
       border-radius: 2px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       font-family: inherit;
+      letter-spacing: .03em;
     }
-    button:hover { background: #106ebe; }
-    button:active { background: #005a9e; }
+    button:hover  { background: #a93d10; }
+    button:active { background: #8c300c; }
 
-    .status     { min-height: 18px; margin-top: 6px; font-size: 12px; text-align: center; }
-    .status.ok  { color: #107c10; }
-    .status.error { color: #a4262c; }
+    .status       { min-height: 18px; margin-top: 6px; font-size: 12px; text-align: center; }
+    .status.ok    { color: var(--green); }
+    .status.error { color: var(--red); }
   </style>
 </head>
 <body>
 
-  <div style="background:#107c10;color:#fff;text-align:center;padding:5px 8px;border-radius:2px;font-weight:700;font-size:12px;margin-bottom:10px;letter-spacing:.05em;">
-    ✓ v1.1.1 — LOADED
-  </div>
+  <div class="brand-bar">RPA Embed Data · v1.2.0</div>
+
+  <div class="form-body">
 
   <h2>Email</h2>
 
@@ -91,7 +120,7 @@
     <input type="text" id="message-id" readonly placeholder="loading…" style="font-size:10px;font-family:monospace;color:#605e5c;"/>
   </div>
 
-  <h2>Triage</h2>
+  <h2>Embed Data</h2>
 
   <div class="field">
     <label for="f-reference">Reference</label>
@@ -132,8 +161,10 @@
     </select>
   </div>
 
-  <button id="save-btn">Save Triage</button>
+  <button id="save-btn">RPA Embed Data</button>
   <div id="status" class="status"></div>
+
+  </div><!-- /.form-body -->
 
   <script src="taskpane.js"></script>
 </body>
