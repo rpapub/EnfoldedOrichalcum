@@ -1,4 +1,4 @@
-/* global Office, getCachedToken, cacheToken */
+/* global Office, getCachedToken, cacheToken, deleteGraphExtension */
 
 const CLIENT_ID  = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
 const DIALOG_URL = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dialog.html";
@@ -89,14 +89,10 @@ function renderObject(obj, depth) {
   table.className = "kv-table";
   keys.forEach(k => {
     const tr = document.createElement("tr");
-    const tdKey = document.createElement("td");
-    tdKey.className = "key";
-    tdKey.textContent = k;
-    const tdVal = document.createElement("td");
-    tdVal.className = "val";
+    const tdKey = document.createElement("td"); tdKey.className = "key"; tdKey.textContent = k;
+    const tdVal = document.createElement("td"); tdVal.className = "val";
     tdVal.appendChild(renderValue(obj[k], depth + 1));
-    tr.appendChild(tdKey);
-    tr.appendChild(tdVal);
+    tr.appendChild(tdKey); tr.appendChild(tdVal);
     table.appendChild(tr);
   });
   wrap.appendChild(table);
@@ -121,13 +117,69 @@ function renderArray(arr, depth) {
   return wrap;
 }
 
-function renderExtension(ext) {
+function renderExtension(ext, onDelete) {
   const card = document.createElement("div");
   card.className = "ext-card";
+
   const header = document.createElement("div");
   header.className = "ext-card-header";
+
+  const title = document.createElement("span");
   const rawId = ext.id ?? "(unknown extension)";
-  header.textContent = rawId.replace(/^Microsoft\.OutlookServices\.OpenTypeExtension\./, "");
+  title.textContent = rawId.replace(/^Microsoft\.OutlookServices\.OpenTypeExtension\./, "");
+  header.appendChild(title);
+
+  if (onDelete) {
+    const delBtn = document.createElement("button");
+    delBtn.className = "ext-card-delete";
+    delBtn.textContent = "Delete";
+    let pendingConfirm = false;
+
+    const resetBtn = () => {
+      pendingConfirm = false;
+      delBtn.textContent = "Delete";
+      delBtn.classList.remove("confirm");
+    };
+
+    delBtn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      if (!pendingConfirm) {
+        pendingConfirm = true;
+        delBtn.textContent = "Confirm?";
+        delBtn.classList.add("confirm");
+        // Reset when user clicks anywhere outside the button
+        const outsideHandler = (ev) => {
+          if (!delBtn.contains(ev.target)) {
+            resetBtn();
+            document.removeEventListener("click", outsideHandler);
+          }
+        };
+        document.addEventListener("click", outsideHandler);
+        return;
+      }
+      delBtn.disabled = true;
+      delBtn.textContent = "Deleting…";
+      try {
+        await onDelete(rawId);
+        card.remove();
+        // If no extension cards remain, show empty state
+        const container = document.getElementById("extensions-container");
+        if (container.children.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "empty";
+          empty.textContent = "No extensions found on this message.";
+          container.appendChild(empty);
+        }
+      } catch (e) {
+        resetBtn();
+        delBtn.disabled = false;
+        setStatus(e.message || "Delete failed.", true);
+      }
+    });
+
+    header.appendChild(delBtn);
+  }
+
   card.appendChild(header);
   const body = document.createElement("div");
   body.className = "ext-card-body";
@@ -142,8 +194,8 @@ function setStatus(msg, isError) {
   el.className = isError ? "error" : "";
 }
 
-function appendExtension(ext) {
-  document.getElementById("extensions-container").appendChild(renderExtension(ext));
+function appendExtension(ext, onDelete) {
+  document.getElementById("extensions-container").appendChild(renderExtension(ext, onDelete));
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -175,7 +227,10 @@ Office.onReady(async () => {
     }
 
     setStatus("");
-    extensions.forEach(appendExtension);
+    extensions.forEach(ext => {
+      const onDelete = (extId) => deleteGraphExtension(token, restId, extId);
+      appendExtension(ext, onDelete);
+    });
   } catch (e) {
     if (e.status === 405) {
       // Personal MSA accounts don't support the extensions collection endpoint.
@@ -197,7 +252,11 @@ Office.onReady(async () => {
           if (!ext) {
             setStatus(`Not found: ${name}`, true);
           } else {
-            appendExtension(ext);
+            const onDelete = async (extId) => {
+              await deleteGraphExtension(token, restId, extId);
+              setStatus("Extension deleted.");
+            };
+            appendExtension(ext, onDelete);
           }
         } catch (lookupErr) {
           setStatus(lookupErr.message || "Lookup failed.", true);

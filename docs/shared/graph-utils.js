@@ -25,6 +25,16 @@ async function readGraphExtension(token, restMessageId, extensionName) {
   return res.json();
 }
 
+async function deleteGraphExtension(token, restMessageId, extensionId) {
+  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions/${encodeURIComponent(extensionId)}`;
+  const res = await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 204 || res.ok) return;
+  const text = await res.text().catch(() => "");
+  const err = new Error(text || `Graph error ${res.status}`);
+  err.status = res.status;
+  throw err;
+}
+
 async function writeGraphExtension(token, restMessageId, extensionName, data) {
   const baseUrl = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
   const body = JSON.stringify({

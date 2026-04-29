@@ -84,9 +84,28 @@
       font-size: 11px;
       font-weight: 700;
       color: var(--blue);
-      word-break: break-all;
       letter-spacing: .02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
+    .ext-card-header span { flex: 1; min-width: 0; word-break: break-all; }
+
+    .ext-card-delete {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--base1);
+      background: transparent;
+      border: 1px solid var(--base1);
+      border-radius: 2px;
+      padding: 1px 6px;
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+    .ext-card-delete:hover { color: var(--red); border-color: var(--red); }
+    .ext-card-delete.confirm { color: var(--red); border-color: var(--red); }
 
     .ext-card-body { padding: 6px 10px; }
 
@@ -162,7 +181,7 @@
     <div id="extensions-container"></div>
   </div>
 
-  <script src="../../shared/graph-utils.js?v=9"></script>
-  <script src="taskpane.js?v=10"></script>
+  <script src="../../shared/graph-utils.js?v=10"></script>
+  <script src="taskpane.js?v=11"></script>
 </body>
 </html>
