@@ -95,19 +95,6 @@
       outline: none; border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue);
     }
 
-    .checkbox-field {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .checkbox-field input[type="checkbox"] {
-      width: auto;
-      flex-shrink: 0;
-      margin: 0;
-      accent-color: var(--blue);
-    }
-    .checkbox-field label { margin-bottom: 0; }
-
     .email-val {
       display: block;
       font-size: 12px;
@@ -217,18 +204,11 @@
       </div>
 
       <h2>Evidence</h2>
-      <div class="field checkbox-field">
-        <input type="checkbox" id="f-has-body-instruction"/>
-        <label for="f-has-body-instruction">Has Body Instruction</label>
-      </div>
       <div class="field">
         <label for="f-attachment-profile">Attachment Profile</label>
         <select id="f-attachment-profile"></select>
       </div>
-      <div class="field">
-        <label for="f-evidence-summary">Evidence Summary</label>
-        <input type="text" id="f-evidence-summary"/>
-      </div>
+      <div id="evidence-extra"></div>
 
       <button class="save-btn" id="save-btn">Save Triage — Preview</button>
       <pre id="preview-output"></pre>

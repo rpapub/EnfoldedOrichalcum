@@ -29,7 +29,7 @@ def test_testbed_title(testbed):
 def test_testbed_form_fields_present(testbed):
     for field_id in ("f-case-id", "f-case-status", "f-state-version",
                      "f-triage-result", "f-triage-confidence", "f-triage-summary",
-                     "f-has-body-instruction", "f-attachment-profile", "f-evidence-summary"):
+                     "f-attachment-profile"):
         expect(testbed.locator(f"#{field_id}")).to_be_visible()
 
 
@@ -85,6 +85,5 @@ def test_taskpane_html_loads(page: Page):
 def test_taskpane_has_triage_fields(page: Page):
     page.goto(f"{BASE}/taskpane.html", wait_until="domcontentloaded")
     for field_id in ("f-case-id", "f-case-status", "f-triage-result",
-                     "f-triage-confidence", "f-triage-summary",
-                     "f-has-body-instruction", "f-attachment-profile", "f-evidence-summary"):
+                     "f-triage-confidence", "f-triage-summary", "f-attachment-profile"):
         expect(page.locator(f"#{field_id}")).to_be_attached()

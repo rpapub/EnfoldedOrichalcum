@@ -5,6 +5,9 @@ const EXTENSION_NAME   = "net.cprima.rpapub.CPMForge.M365.triage";
 const DIALOG_URL       = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dialog.html";
 const FORM_STORAGE_KEY = "mail_triage_pending_form";
 
+// Keys not rendered as freeform evidence fields
+const EVIDENCE_SKIP = new Set(["attachmentProfile", "@odata.type", "@odata.context", "@odata.etag", "id"]);
+
 let currentStateVersion = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -28,7 +31,7 @@ function initSelects() {
     ["new","new"], ["triaged","triaged"], ["in_progress","in_progress"],
     ["resolved","resolved"], ["closed","closed"]
   ]);
-  // no_action and low are first → selected by default for untriaged messages
+  // no_action and low first — sensible defaults for an untriaged message
   populateSelect("f-triage-result", [
     ["no_action","no_action"], ["work_required","work_required"],
     ["information_only","information_only"], ["automated_candidate","automated_candidate"],
@@ -51,16 +54,42 @@ function showStatus(msg, isError) {
   if (!isError) setTimeout(() => { el.textContent = ""; el.className = "status"; }, 4000);
 }
 
+// ── Dynamic evidence key-value fields ────────────────────────────────────────
+function renderExtraEvidence(evidence) {
+  const container = document.getElementById("evidence-extra");
+  container.innerHTML = "";
+  Object.entries(evidence).forEach(([key, val]) => {
+    if (EVIDENCE_SKIP.has(key)) return;
+    const div = document.createElement("div");
+    div.className = "field ev-field";
+    const lbl = document.createElement("label");
+    lbl.textContent = key;
+    const input = document.createElement("input");
+    input.type = "text";
+    input.dataset.evKey = key;
+    input.value = val == null ? "" : String(val);
+    div.appendChild(lbl);
+    div.appendChild(input);
+    container.appendChild(div);
+  });
+}
+
+function collectExtraEvidence() {
+  const obj = {};
+  document.querySelectorAll("#evidence-extra input[data-ev-key]").forEach(input => {
+    if (input.value.trim() !== "") obj[input.dataset.evKey] = input.value.trim();
+  });
+  return obj;
+}
+
 // ── Output ────────────────────────────────────────────────────────────────────
 function buildOutput() {
-  const hasBodyEl         = document.getElementById("f-has-body-instruction");
   const attachmentProfile = document.getElementById("f-attachment-profile").value;
-  const evidenceSummary   = document.getElementById("f-evidence-summary").value.trim();
+  const extraEvidence     = collectExtraEvidence();
 
   const evidenceObj = {};
-  if (hasBodyEl.dataset.set)  evidenceObj.hasBodyInstruction = hasBodyEl.checked;
-  if (attachmentProfile)      evidenceObj.attachmentProfile  = attachmentProfile;
-  if (evidenceSummary)        evidenceObj.evidenceSummary    = evidenceSummary;
+  if (attachmentProfile) evidenceObj.attachmentProfile = attachmentProfile;
+  Object.assign(evidenceObj, extraEvidence);
 
   const out = {
     caseId:       document.getElementById("f-case-id").value.trim(),
@@ -89,35 +118,26 @@ function populateFormFromExtension(ext) {
     if (ext.triage.summary != null) document.getElementById("f-triage-summary").value    = ext.triage.summary;
   }
 
-  // evidence is optional; only set fields that are present in the extension
-  const e = ext.evidence || {};
-  const hasBodyEl = document.getElementById("f-has-body-instruction");
-  if (e.hasBodyInstruction != null) {
-    hasBodyEl.checked = e.hasBodyInstruction;
-    hasBodyEl.dataset.set = "1";
-  }
-  if (e.attachmentProfile != null) {
-    document.getElementById("f-attachment-profile").value = e.attachmentProfile;
-  }
-  if (e.evidenceSummary != null) {
-    document.getElementById("f-evidence-summary").value = e.evidenceSummary;
+  // evidence is optional; render whatever keys exist — attachmentProfile gets its dropdown,
+  // everything else becomes a freeform text field
+  if (ext.evidence) {
+    const { attachmentProfile, ...rest } = ext.evidence;
+    if (attachmentProfile != null) document.getElementById("f-attachment-profile").value = attachmentProfile;
+    renderExtraEvidence(rest);
   }
 }
 
 // ── Form persistence ──────────────────────────────────────────────────────────
 function saveFormToStorage() {
-  const hasBodyEl = document.getElementById("f-has-body-instruction");
   localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify({
-    caseId:             document.getElementById("f-case-id").value,
-    caseStatus:         document.getElementById("f-case-status").value,
-    triageResult:       document.getElementById("f-triage-result").value,
-    triageConfidence:   document.getElementById("f-triage-confidence").value,
-    triageSummary:      document.getElementById("f-triage-summary").value,
-    hasBodyInstruction: hasBodyEl.checked,
-    hasBodySet:         hasBodyEl.dataset.set || "",
-    attachmentProfile:  document.getElementById("f-attachment-profile").value,
-    evidenceSummary:    document.getElementById("f-evidence-summary").value,
-    stateVersion:       currentStateVersion,
+    caseId:            document.getElementById("f-case-id").value,
+    caseStatus:        document.getElementById("f-case-status").value,
+    triageResult:      document.getElementById("f-triage-result").value,
+    triageConfidence:  document.getElementById("f-triage-confidence").value,
+    triageSummary:     document.getElementById("f-triage-summary").value,
+    attachmentProfile: document.getElementById("f-attachment-profile").value,
+    extraEvidence:     collectExtraEvidence(),
+    stateVersion:      currentStateVersion,
   }));
 }
 
@@ -126,16 +146,13 @@ function restoreFormFromStorage() {
   if (!raw) return false;
   try {
     const d = JSON.parse(raw);
-    if (d.caseId)            document.getElementById("f-case-id").value           = d.caseId;
-    if (d.caseStatus)        document.getElementById("f-case-status").value       = d.caseStatus;
-    if (d.triageResult)      document.getElementById("f-triage-result").value     = d.triageResult;
-    if (d.triageConfidence)  document.getElementById("f-triage-confidence").value = d.triageConfidence;
+    if (d.caseId)           document.getElementById("f-case-id").value           = d.caseId;
+    if (d.caseStatus)       document.getElementById("f-case-status").value       = d.caseStatus;
+    if (d.triageResult)     document.getElementById("f-triage-result").value     = d.triageResult;
+    if (d.triageConfidence) document.getElementById("f-triage-confidence").value = d.triageConfidence;
     if (d.triageSummary != null) document.getElementById("f-triage-summary").value = d.triageSummary;
-    const hasBodyEl = document.getElementById("f-has-body-instruction");
-    hasBodyEl.checked = !!d.hasBodyInstruction;
-    if (d.hasBodySet)        hasBodyEl.dataset.set = "1";
     if (d.attachmentProfile) document.getElementById("f-attachment-profile").value = d.attachmentProfile;
-    if (d.evidenceSummary != null) document.getElementById("f-evidence-summary").value = d.evidenceSummary;
+    if (d.extraEvidence && Object.keys(d.extraEvidence).length > 0) renderExtraEvidence(d.extraEvidence);
     if (d.stateVersion != null) currentStateVersion = parseInt(d.stateVersion, 10);
     return true;
   } catch (_) { return false; }

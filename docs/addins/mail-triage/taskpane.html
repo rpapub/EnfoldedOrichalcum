@@ -68,20 +68,6 @@
       box-shadow: 0 0 0 1px var(--blue);
     }
 
-    /* Checkbox row */
-    .checkbox-field {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .checkbox-field input[type="checkbox"] {
-      width: auto;
-      flex-shrink: 0;
-      margin: 0;
-      accent-color: var(--blue);
-    }
-    .checkbox-field label { margin-bottom: 0; }
-
     /* Email display */
     .email-val {
       display: block;
@@ -90,6 +76,9 @@
       padding: 4px 0;
       word-break: break-all;
     }
+
+    /* Dynamic evidence key-value fields */
+    .ev-field label { color: var(--base1); font-style: italic; }
 
     button {
       display: block;
@@ -113,15 +102,8 @@
     .status.ok    { color: var(--green); }
     .status.error { color: var(--red); }
 
-    .signout-row {
-      text-align: center;
-      margin-top: 12px;
-    }
-    .signout-row a {
-      font-size: 11px;
-      color: var(--base1);
-      text-decoration: none;
-    }
+    .signout-row { text-align: center; margin-top: 12px; }
+    .signout-row a { font-size: 11px; color: var(--base1); text-decoration: none; }
     .signout-row a:hover { color: var(--base00); text-decoration: underline; }
   </style>
 </head>
@@ -170,18 +152,11 @@
     </div>
 
     <h2>Evidence</h2>
-    <div class="field checkbox-field">
-      <input type="checkbox" id="f-has-body-instruction"/>
-      <label for="f-has-body-instruction">Has Body Instruction</label>
-    </div>
     <div class="field">
       <label for="f-attachment-profile">Attachment Profile</label>
       <select id="f-attachment-profile"></select>
     </div>
-    <div class="field">
-      <label for="f-evidence-summary">Evidence Summary</label>
-      <input type="text" id="f-evidence-summary" placeholder="Auto-detected on load…"/>
-    </div>
+    <div id="evidence-extra"></div>
 
     <button id="save-btn">Save Triage</button>
     <div id="status" class="status"></div>
@@ -190,6 +165,6 @@
   </div><!-- /.form-body -->
 
   <script src="../../shared/graph-utils.js?v=3"></script>
-  <script src="taskpane.js?v=2"></script>
+  <script src="taskpane.js?v=3"></script>
 </body>
 </html>
