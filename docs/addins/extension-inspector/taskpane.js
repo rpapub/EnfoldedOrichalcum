@@ -46,18 +46,21 @@ async function getToken() {
 }
 
 // ── Graph ────────────────────────────────────────────────────────────────────
+function graphError(status, text) {
+  const err = new Error(text || `Graph error ${status}`);
+  err.status = status;
+  return err;
+}
+
 async function fetchAllExtensions(token, restMessageId) {
   const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.ok) {
     const json = await res.json();
-    return { extensions: json.value ?? [], msaLimit: false };
+    return json.value ?? [];
   }
-  if (res.status === 405) {
-    return { extensions: [], msaLimit: true };
-  }
-  const text = await res.text();
-  throw new Error(`Graph ${res.status}: ${text}`);
+  const text = await res.text().catch(() => "");
+  throw graphError(res.status, text);
 }
 
 async function fetchExtensionByName(token, restMessageId, name) {
@@ -65,7 +68,7 @@ async function fetchExtensionByName(token, restMessageId, name) {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 404) return null;
   const text = await res.text();
-  if (!res.ok) throw new Error(`Graph ${res.status}: ${text}`);
+  if (!res.ok) throw graphError(res.status, text);
   return JSON.parse(text);
 }
 
@@ -145,28 +148,42 @@ function appendExtension(ext) {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 Office.onReady(async () => {
+  const item = Office.context.mailbox.item;
+  document.getElementById("ei-from").textContent    = item.from?.emailAddress ?? "—";
+  document.getElementById("ei-subject").textContent = item.subject ?? "—";
+
+  const restId = Office.context.mailbox.convertToRestId(
+    item.itemId,
+    Office.MailboxEnums.RestVersion.v2_0
+  );
+
+  let token;
   try {
-    const item = Office.context.mailbox.item;
-    document.getElementById("ei-from").textContent    = item.from?.emailAddress ?? "—";
-    document.getElementById("ei-subject").textContent = item.subject ?? "—";
-
-    const restId = Office.context.mailbox.convertToRestId(
-      item.itemId,
-      Office.MailboxEnums.RestVersion.v2_0
-    );
-
     setStatus("Authenticating…");
-    const token = await getToken();
+    token = await getToken();
 
     setStatus("Loading extensions…");
-    const { extensions, msaLimit } = await fetchAllExtensions(token, restId);
+    const extensions = await fetchAllExtensions(token, restId);
 
-    if (msaLimit) {
+    if (extensions.length === 0) {
       setStatus("");
-      const fallback = document.getElementById("msa-fallback");
-      fallback.style.display = "block";
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "No extensions found on this message.";
+      document.getElementById("extensions-container").appendChild(empty);
+      return;
+    }
 
-      const input = document.getElementById("ext-name-input");
+    setStatus("");
+    extensions.forEach(appendExtension);
+  } catch (e) {
+    if (e.status === 405) {
+      // Personal MSA accounts don't support the extensions collection endpoint.
+      // Fall back to name-based lookup.
+      setStatus("");
+      document.getElementById("msa-fallback").style.display = "block";
+
+      const input     = document.getElementById("ext-name-input");
       const container = document.getElementById("extensions-container");
 
       const doLookup = async () => {
@@ -182,30 +199,15 @@ Office.onReady(async () => {
           } else {
             appendExtension(ext);
           }
-        } catch (e) {
-          setStatus(e.message || "Lookup failed.", true);
+        } catch (lookupErr) {
+          setStatus(lookupErr.message || "Lookup failed.", true);
         }
       };
 
       document.getElementById("lookup-btn").addEventListener("click", doLookup);
-
-      // Auto-trigger if the input has a default value
       if (input.value.trim()) doLookup();
-      return;
+    } else {
+      setStatus(e.message || "Failed to load extensions.", true);
     }
-
-    if (extensions.length === 0) {
-      setStatus("");
-      const empty = document.createElement("p");
-      empty.className = "empty";
-      empty.textContent = "No extensions found on this message.";
-      document.getElementById("extensions-container").appendChild(empty);
-      return;
-    }
-
-    setStatus("");
-    extensions.forEach(appendExtension);
-  } catch (e) {
-    setStatus(e.message || "Failed to load extensions.", true);
   }
 });
