@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel="icon" href="data:,">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mail Triage</title>
+  <link rel="stylesheet" href="../../shared/solarized.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 13px;
+      color: var(--base0);
+      background: var(--base3);
+      padding: 0 0 12px;
+    }
+
+    .brand-bar {
+      background: var(--orange);
+      color: #fff;
+      text-align: right;
+      padding: 3px 10px;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: .04em;
+      margin-bottom: 10px;
+      opacity: .9;
+    }
+
+    .form-body { padding: 0 12px; }
+
+    h2 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--blue);
+      margin: 12px 0 6px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid var(--base2);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    h2:first-of-type { margin-top: 0; }
+
+    .field { margin-bottom: 8px; }
+    label  { display: block; font-weight: 600; margin-bottom: 2px; color: var(--base00); font-size: 12px; }
+
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid var(--base1);
+      border-radius: 2px;
+      font-size: 13px;
+      font-family: inherit;
+      background: var(--base3);
+      color: var(--base00);
+    }
+    input[readonly] { background: var(--base2); color: var(--base1); }
+    textarea { resize: vertical; }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 1px var(--blue);
+    }
+
+    /* Checkbox row */
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .checkbox-field input[type="checkbox"] {
+      width: auto;
+      flex-shrink: 0;
+      margin: 0;
+      accent-color: var(--blue);
+    }
+    .checkbox-field label { margin-bottom: 0; }
+
+    /* Email display */
+    .email-val {
+      display: block;
+      font-size: 12px;
+      color: var(--base00);
+      padding: 4px 0;
+      word-break: break-all;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      padding: 8px;
+      background: var(--orange);
+      color: #fff;
+      border: none;
+      border-radius: 2px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: .03em;
+    }
+    button:hover  { background: #a93d10; }
+    button:active { background: #8c300c; }
+
+    .status       { min-height: 18px; margin-top: 6px; font-size: 12px; text-align: center; }
+    .status.ok    { color: var(--green); }
+    .status.error { color: var(--red); }
+
+    .signout-row {
+      text-align: center;
+      margin-top: 12px;
+    }
+    .signout-row a {
+      font-size: 11px;
+      color: var(--base1);
+      text-decoration: none;
+    }
+    .signout-row a:hover { color: var(--base00); text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div class="brand-bar" id="brand-bar">Mail Triage</div>
+
+  <div class="form-body">
+
+    <h2>Email</h2>
+    <div class="field">
+      <label>From</label>
+      <span class="email-val" id="ei-from">—</span>
+    </div>
+    <div class="field">
+      <label>Subject</label>
+      <span class="email-val" id="ei-subject">—</span>
+    </div>
+
+    <h2>Case</h2>
+    <div class="field">
+      <label for="f-case-id">Case ID</label>
+      <input type="text" id="f-case-id" readonly/>
+    </div>
+    <div class="field">
+      <label for="f-case-status">Status</label>
+      <select id="f-case-status"></select>
+    </div>
+    <div class="field">
+      <label for="f-state-version">State Version</label>
+      <input type="text" id="f-state-version" readonly value="0"/>
+    </div>
+
+    <h2>Triage</h2>
+    <div class="field">
+      <label for="f-triage-result">Result</label>
+      <select id="f-triage-result"></select>
+    </div>
+    <div class="field">
+      <label for="f-triage-confidence">Confidence</label>
+      <select id="f-triage-confidence"></select>
+    </div>
+    <div class="field">
+      <label for="f-triage-summary">Summary</label>
+      <textarea id="f-triage-summary" rows="3" placeholder="Triage summary…"></textarea>
+    </div>
+
+    <h2>Evidence</h2>
+    <div class="field checkbox-field">
+      <input type="checkbox" id="f-has-body-instruction"/>
+      <label for="f-has-body-instruction">Has Body Instruction</label>
+    </div>
+    <div class="field">
+      <label for="f-attachment-profile">Attachment Profile</label>
+      <select id="f-attachment-profile"></select>
+    </div>
+    <div class="field">
+      <label for="f-evidence-summary">Evidence Summary</label>
+      <input type="text" id="f-evidence-summary" placeholder="Auto-detected on load…"/>
+    </div>
+
+    <button id="save-btn">Save Triage</button>
+    <div id="status" class="status"></div>
+    <p class="signout-row"><a href="#" id="signout-btn">Sign out</a></p>
+
+  </div><!-- /.form-body -->
+
+  <script src="../../shared/graph-utils.js?v=3"></script>
+  <script src="taskpane.js?v=1"></script>
+</body>
+</html>

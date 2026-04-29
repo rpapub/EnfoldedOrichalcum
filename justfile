@@ -8,6 +8,7 @@ validate addin="embed-data":
 validate-all:
     npx office-addin-manifest validate docs/addins/embed-data/manifest.xml
     npx office-addin-manifest validate docs/addins/extension-inspector/manifest.xml
+    npx office-addin-manifest validate docs/addins/mail-triage/manifest.xml
 
 test:
     uv run pytest
@@ -38,7 +39,7 @@ test-unit:
     npx vitest run --reporter=verbose
 
 test-ui-preview:
-    uv run pytest tests/embed_data/test_ui_preview.py tests/extension_inspector/test_ui_mocked.py -v
+    uv run pytest tests/embed_data/test_ui_preview.py tests/extension_inspector/test_ui_mocked.py tests/mail_triage/test_manifest.py -v
 
 triage:
     #!/usr/bin/env bash

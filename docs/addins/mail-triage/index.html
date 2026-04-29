@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel="icon" href="data:,">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mail Triage — Testbed</title>
+  <link rel="stylesheet" href="../../shared/solarized.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      color: var(--base0);
+      background: var(--base2);
+      padding: 0 0 32px;
+    }
+
+    .brand-bar {
+      background: var(--orange);
+      color: #fff;
+      padding: 10px 24px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    .brand-bar span { font-weight: 400; opacity: .85; font-size: 13px; margin-left: 12px; }
+
+    header {
+      max-width: 960px;
+      margin: 0 auto 24px;
+      padding-top: 24px;
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+    header h1 { font-size: 22px; font-weight: 700; color: var(--blue); }
+    header p  { margin-top: 6px; color: var(--base1); }
+
+    .layout {
+      display: flex;
+      gap: 24px;
+      max-width: 960px;
+      margin: 0 auto;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    /* ── Preview pane ── */
+    .preview-wrap { flex: 0 0 320px; }
+    .preview-badge {
+      display: inline-block;
+      background: var(--base2);
+      color: var(--base00);
+      border: 1px solid var(--base1);
+      border-radius: 2px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .preview-frame {
+      background: var(--base3);
+      border: 1px solid var(--base1);
+      border-radius: 4px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+
+    /* ── Form styles ── */
+    .preview-frame h2 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--blue);
+      margin: 10px 0 5px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid var(--base2);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .preview-frame h2:first-of-type { margin-top: 0; }
+    .field { margin-bottom: 7px; }
+    label  { display: block; font-weight: 600; font-size: 12px; margin-bottom: 2px; color: var(--base00); }
+    input[type="text"], select, textarea {
+      width: 100%; padding: 4px 7px;
+      border: 1px solid var(--base1); border-radius: 2px;
+      font-size: 12px; font-family: inherit;
+      background: #fff; color: var(--base00);
+    }
+    textarea { resize: vertical; }
+    input[readonly] { background: var(--base2); color: var(--base1); }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue);
+    }
+
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .checkbox-field input[type="checkbox"] {
+      width: auto;
+      flex-shrink: 0;
+      margin: 0;
+      accent-color: var(--blue);
+    }
+    .checkbox-field label { margin-bottom: 0; }
+
+    .email-val {
+      display: block;
+      font-size: 12px;
+      color: var(--base00);
+      padding: 3px 0;
+      word-break: break-all;
+    }
+
+    button.save-btn {
+      display: block; width: 100%; margin-top: 12px; padding: 7px;
+      background: var(--orange); color: #fff; border: none; border-radius: 2px;
+      font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    button.save-btn:hover  { background: #a93d10; }
+    button.save-btn:active { background: #8c300c; }
+    #preview-output {
+      display: none; margin-top: 8px; padding: 8px;
+      background: var(--base2); border: 1px solid var(--base1); border-radius: 2px;
+      font-family: "Cascadia Code", Consolas, monospace; font-size: 11px;
+      white-space: pre; overflow-x: auto; color: var(--base00);
+    }
+    .status     { min-height: 16px; margin-top: 5px; font-size: 11px; text-align: center; }
+    .status.ok  { color: var(--green); }
+    .status.error { color: var(--red); }
+
+    /* ── Install guide ── */
+    .guide { flex: 1 1 400px; }
+    .guide h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--base00); }
+    .guide h3 { font-size: 13px; font-weight: 700; margin: 16px 0 6px; color: var(--base00); }
+    .guide ol  { padding-left: 18px; }
+    .guide li  { margin-bottom: 6px; line-height: 1.5; }
+    .guide code {
+      background: var(--base2); padding: 1px 5px; border-radius: 2px;
+      font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; color: var(--base00);
+    }
+
+    .manifest-link {
+      display: inline-block; margin: 12px 0;
+      padding: 8px 16px; background: var(--orange); color: #fff;
+      text-decoration: none; border-radius: 2px; font-weight: 700; font-size: 13px;
+    }
+    .manifest-link:hover { background: #a93d10; }
+
+    .note {
+      background: var(--base3); border-left: 3px solid var(--blue);
+      padding: 8px 12px; margin-top: 12px; font-size: 12px; color: var(--base0);
+      border-radius: 0 2px 2px 0;
+    }
+
+    @media (max-width: 600px) {
+      .preview-wrap { flex: 0 0 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="brand-bar">Mail Triage <span>Outlook Add-in · development testbed</span></div>
+
+<header>
+  <h1>Mail Triage</h1>
+  <p>Outlook task pane add-in — development testbed hosted on GitHub Pages</p>
+</header>
+
+<div class="layout" style="padding: 0 16px;">
+
+  <!-- ── Live browser preview ── -->
+  <div class="preview-wrap">
+    <div class="preview-badge">Browser Preview</div>
+    <div class="preview-frame">
+
+      <h2>Email</h2>
+      <div class="field">
+        <label>From</label>
+        <span class="email-val" id="ei-from">sender@example.com</span>
+      </div>
+      <div class="field">
+        <label>Subject</label>
+        <span class="email-val" id="ei-subject">[PREVIEW] Sample Email Subject</span>
+      </div>
+
+      <h2>Case</h2>
+      <div class="field">
+        <label for="f-case-id">Case ID</label>
+        <input type="text" id="f-case-id" readonly/>
+      </div>
+      <div class="field">
+        <label for="f-case-status">Status</label>
+        <select id="f-case-status"></select>
+      </div>
+      <div class="field">
+        <label for="f-state-version">State Version</label>
+        <input type="text" id="f-state-version" readonly value="0"/>
+      </div>
+
+      <h2>Triage</h2>
+      <div class="field">
+        <label for="f-triage-result">Result</label>
+        <select id="f-triage-result"></select>
+      </div>
+      <div class="field">
+        <label for="f-triage-confidence">Confidence</label>
+        <select id="f-triage-confidence"></select>
+      </div>
+      <div class="field">
+        <label for="f-triage-summary">Summary</label>
+        <textarea id="f-triage-summary" rows="3" placeholder="Triage summary…"></textarea>
+      </div>
+
+      <h2>Evidence</h2>
+      <div class="field checkbox-field">
+        <input type="checkbox" id="f-has-body-instruction"/>
+        <label for="f-has-body-instruction">Has Body Instruction</label>
+      </div>
+      <div class="field">
+        <label for="f-attachment-profile">Attachment Profile</label>
+        <select id="f-attachment-profile"></select>
+      </div>
+      <div class="field">
+        <label for="f-evidence-summary">Evidence Summary</label>
+        <input type="text" id="f-evidence-summary"/>
+      </div>
+
+      <button class="save-btn" id="save-btn">Save Triage — Preview</button>
+      <pre id="preview-output"></pre>
+      <div id="status" class="status"></div>
+
+    </div><!-- /.preview-frame -->
+  </div><!-- /.preview-wrap -->
+
+  <!-- ── Install guide ── -->
+  <div class="guide">
+    <h2>Install</h2>
+
+    <a class="manifest-link" href="manifest.xml" download="manifest.xml">
+      Download manifest.xml
+    </a>
+
+    <p style="margin:8px 0 4px;font-weight:600;font-size:12px">Outlook on the Web</p>
+    <ol>
+      <li>Settings (gear) → <em>Manage Add-ins</em> → <em>Custom Add-ins</em> → <strong>Add from URL</strong>.</li>
+      <li>Paste: <code>https://rpapub.github.io/EnfoldedOrichalcum/addins/mail-triage/manifest.xml</code></li>
+    </ol>
+
+    <p style="margin:8px 0 4px;font-weight:600;font-size:12px">Outlook Desktop / New Outlook</p>
+    <ol>
+      <li>File → <em>Manage Add-ins</em> (opens Outlook on the Web — follow steps above).</li>
+    </ol>
+
+    <h3>Usage</h3>
+    <ol>
+      <li>Open any email → click <strong>Mail Triage</strong> in the ribbon.</li>
+      <li>Review auto-detected evidence fields and adjust if needed.</li>
+      <li>Update the <strong>Status</strong> field and click <strong>Save Triage</strong>.</li>
+      <li>On first use a sign-in popup will appear — sign in with your Microsoft account.</li>
+    </ol>
+
+    <div class="note">
+      <strong>Requirements:</strong> A Microsoft account (@outlook.com or Microsoft 365).
+      Gmail/Yahoo accounts do not support add-ins.<br/><br/>
+      <strong>Graph extension:</strong> <code>net.cprima.rpapub.CPMForge.M365.triage</code><br/>
+      <code>GET /v1.0/me/messages/{id}/extensions/net.cprima.rpapub.CPMForge.M365.triage</code>
+    </div>
+  </div><!-- /.guide -->
+
+</div><!-- /.layout -->
+
+<script src="../../shared/graph-utils.js"></script>
+<script src="taskpane.js"></script>
+</body>
+</html>

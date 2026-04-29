@@ -26,6 +26,7 @@ jobs:
         run: |
           npx --yes office-addin-manifest validate docs/addins/embed-data/manifest.xml
           npx --yes office-addin-manifest validate docs/addins/extension-inspector/manifest.xml
+          npx --yes office-addin-manifest validate docs/addins/mail-triage/manifest.xml
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
