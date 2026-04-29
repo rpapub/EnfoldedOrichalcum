@@ -56,11 +56,65 @@ async function getToken() {
   return getTokenViaDialog();
 }
 
+// ── Graph probes (run all in parallel, log everything) ───────────────────────
+async function probe(label, fetchFn) {
+  try {
+    await fetchFn();
+  } catch (e) {
+    LOG(`[PROBE] ${label} — EXCEPTION:`, e.message);
+  }
+}
+
+async function probeHttp(token, label, url) {
+  const headers = { Authorization: `Bearer ${token}` };
+  LOG(`[PROBE] ${label}\n  → ${url}`);
+  const res = await fetch(url, { headers });
+  const text = await res.text();
+  LOG(`[PROBE] ${label} — ${res.status}\n`, text);
+}
+
+async function probeEws(ewsId) {
+  const soap = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+               xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+  <soap:Body>
+    <GetItem xmlns="http://schemas.microsoft.com/exchange/services/2006/messages">
+      <ItemShape>
+        <t:BaseShape>AllProperties</t:BaseShape>
+      </ItemShape>
+      <ItemIds>
+        <t:ItemId Id="${ewsId}"/>
+      </ItemIds>
+    </GetItem>
+  </soap:Body>
+</soap:Envelope>`;
+  LOG("[PROBE] EWS GetItem AllProperties — sending");
+  return new Promise(resolve => {
+    Office.context.mailbox.makeEwsRequestAsync(soap, result => {
+      LOG("[PROBE] EWS GetItem AllProperties —", result.status, "\n", result.value);
+      resolve();
+    });
+  });
+}
+
+async function runAllProbes(token, restMessageId, ewsId) {
+  const G = (ver, path) =>
+    `https://graph.microsoft.com/${ver}/me/messages/${restMessageId}${path}`;
+
+  await Promise.allSettled([
+    probe("v1.0 /extensions nav",              () => probeHttp(token, "v1.0 /extensions nav",              G("v1.0", "/extensions"))),
+    probe("beta /extensions nav",              () => probeHttp(token, "beta /extensions nav",              G("beta", "/extensions"))),
+    probe("v1.0 $expand=extensions (no filter)",() => probeHttp(token, "v1.0 $expand=extensions (no filter)",G("v1.0", "?$expand=extensions&$select=id"))),
+    probe("beta $expand=extensions (no filter)",() => probeHttp(token, "beta $expand=extensions (no filter)",G("beta", "?$expand=extensions&$select=id"))),
+    probe("v1.0 internetMessageHeaders",       () => probeHttp(token, "v1.0 internetMessageHeaders",       G("v1.0", "?$select=id,internetMessageId,internetMessageHeaders"))),
+    probe("v1.0 singleValueExtendedProperties",() => probeHttp(token, "v1.0 singleValueExtendedProperties",G("v1.0", "/singleValueExtendedProperties?$filter=startswith(id,'String')"))),
+    probe("beta singleValueExtendedProperties",() => probeHttp(token, "beta singleValueExtendedProperties",G("beta", "/singleValueExtendedProperties?$filter=startswith(id,'String')"))),
+    probe("EWS GetItem AllProperties",         () => probeEws(ewsId)),
+  ]);
+}
+
 // ── Graph ────────────────────────────────────────────────────────────────────
 async function fetchAllExtensions(token, restMessageId) {
-  // The /extensions navigation property is the correct endpoint for listing all
-  // extensions. It works for work/school accounts. Personal MSA accounts return
-  // 405 — in that case we surface the manual lookup UI instead.
   const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
   LOG("fetching all extensions:", url);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -182,6 +236,9 @@ Office.onReady(async () => {
 
     setStatus("Authenticating…");
     const token = await getToken();
+
+    setStatus("Probing…");
+    await runAllProbes(token, restId, item.itemId);
 
     setStatus("Loading extensions…");
     const { extensions, msaLimit } = await fetchAllExtensions(token, restId);
