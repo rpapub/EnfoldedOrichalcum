@@ -53,8 +53,10 @@ async function deleteGraphExtension(token, restMessageId, extensionId) {
 
 async function writeGraphExtension(token, restMessageId, extensionName, data) {
   const baseUrl = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
+  const patchUrl = `${baseUrl}/${extensionName}`;
   const payload = {
     "@odata.type": "microsoft.graph.openTypeExtension",
+    id: extensionName,
     extensionName,
     ...data
   };
@@ -70,12 +72,12 @@ async function writeGraphExtension(token, restMessageId, extensionName, data) {
   let res = await fetch(baseUrl, { method: "POST", headers, body });
   console.log("[graph] POST status", res.status);
 
-  if (res.status === 409) {
-    const patchUrl = `${baseUrl}/${extensionName}`;
-    console.log("[graph] 409 → PATCH", patchUrl);
+  // 409 = already exists; 500 = some Exchange backends return this instead of 409
+  if (res.status === 409 || res.status === 500) {
+    console.log(`[graph] ${res.status} → PATCH`, patchUrl);
     res = await fetch(patchUrl, { method: "PATCH", headers, body });
     console.log("[graph] PATCH status", res.status);
-    if (res.status !== 204) {
+    if (!res.ok) {
       const detail = await res.text().catch(() => "");
       console.error("[graph] PATCH error body", detail);
       throw graphError(res.status, `Extension update failed: ${res.status}`);
