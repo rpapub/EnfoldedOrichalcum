@@ -62,13 +62,13 @@ def test_preview_output_shows_nested_json(testbed):
     assert "confidence" in data["triage"]
 
 
-def test_preview_evidence_present_when_set(testbed):
+def test_preview_triage_defaults(testbed):
     testbed.locator("#save-btn").click()
     raw = testbed.locator("#preview-output").text_content()
     data = json.loads(raw)
-    assert "evidence" in data
-    assert "attachmentProfile" in data["evidence"]
-    assert "evidenceSummary" in data["evidence"]
+    assert data["triage"]["result"] == "no_action"
+    assert data["triage"]["confidence"] == "low"
+    assert "evidence" not in data  # no evidence for an untriaged preview
 
 
 def test_manifest_xml_reachable(page: Page):

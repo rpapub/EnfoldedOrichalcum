@@ -7,39 +7,6 @@ const FORM_STORAGE_KEY = "mail_triage_pending_form";
 
 let currentStateVersion = 0;
 
-// ── Evidence auto-detection ───────────────────────────────────────────────────
-function detectAttachmentProfile(attachments) {
-  if (!attachments || attachments.length === 0) return "none";
-  const names = attachments.map(a => (a.name || "").toLowerCase());
-  const hasPdf   = names.some(n => n.endsWith(".pdf"));
-  const hasExcel = names.some(n => n.endsWith(".xlsx") || n.endsWith(".xls"));
-  if (hasPdf && hasExcel) return "pdf_and_excel";
-  if (hasPdf)   return "pdf_only";
-  if (hasExcel) return "excel_only";
-  return "other";
-}
-
-function buildEvidenceSummary(attachments, profile) {
-  if (!attachments || attachments.length === 0 || profile === "none") return "No attachments.";
-  const count = attachments.length;
-  const types = [...new Set(attachments.map(a => {
-    const n = (a.name || "").toLowerCase();
-    if (n.endsWith(".pdf"))                        return "PDF";
-    if (n.endsWith(".xlsx") || n.endsWith(".xls")) return "Excel";
-    return (a.name.split(".").pop() || "file").toUpperCase();
-  }))];
-  return `${count} attachment${count > 1 ? "s" : ""}: ${types.join(", ")}.`;
-}
-
-function detectBodyInstruction(item) {
-  return new Promise(resolve => {
-    item.body.getAsync(Office.CoercionType.Text, result => {
-      if (result.status !== Office.AsyncResultStatus.Succeeded) { resolve(false); return; }
-      resolve(/\b(please|action required|kindly|could you|request)\b/i.test(result.value || ""));
-    });
-  });
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function generateCaseId() {
   return "C" + Date.now().toString(36).toUpperCase();
@@ -61,16 +28,17 @@ function initSelects() {
     ["new","new"], ["triaged","triaged"], ["in_progress","in_progress"],
     ["resolved","resolved"], ["closed","closed"]
   ]);
+  // no_action and low are first → selected by default for untriaged messages
   populateSelect("f-triage-result", [
-    ["work_required","work_required"], ["information_only","information_only"],
-    ["automated_candidate","automated_candidate"], ["escalation_needed","escalation_needed"],
-    ["no_action","no_action"]
+    ["no_action","no_action"], ["work_required","work_required"],
+    ["information_only","information_only"], ["automated_candidate","automated_candidate"],
+    ["escalation_needed","escalation_needed"]
   ]);
   populateSelect("f-triage-confidence", [
-    ["high","high"], ["medium","medium"], ["low","low"]
+    ["low","low"], ["medium","medium"], ["high","high"]
   ]);
   populateSelect("f-attachment-profile", [
-    ["","— auto / not set —"],
+    ["","— not set —"],
     ["none","none"], ["pdf_only","pdf_only"], ["excel_only","excel_only"],
     ["pdf_and_excel","pdf_and_excel"], ["mixed","mixed"], ["other","other"]
   ]);
@@ -85,7 +53,7 @@ function showStatus(msg, isError) {
 
 // ── Output ────────────────────────────────────────────────────────────────────
 function buildOutput() {
-  const hasBodyEl        = document.getElementById("f-has-body-instruction");
+  const hasBodyEl         = document.getElementById("f-has-body-instruction");
   const attachmentProfile = document.getElementById("f-attachment-profile").value;
   const evidenceSummary   = document.getElementById("f-evidence-summary").value.trim();
 
@@ -108,8 +76,8 @@ function buildOutput() {
   return out;
 }
 
-// ── Form ←→ extension ─────────────────────────────────────────────────────────
-function populateFormFromExtension(ext, autoDetected) {
+// ── Form / extension ──────────────────────────────────────────────────────────
+function populateFormFromExtension(ext) {
   if (ext.caseId)     document.getElementById("f-case-id").value     = ext.caseId;
   if (ext.caseStatus) document.getElementById("f-case-status").value = ext.caseStatus;
   currentStateVersion = parseInt(ext.stateVersion || "0", 10);
@@ -121,41 +89,19 @@ function populateFormFromExtension(ext, autoDetected) {
     if (ext.triage.summary != null) document.getElementById("f-triage-summary").value    = ext.triage.summary;
   }
 
-  // evidence is optional with no required keys; merge ext values over auto-detected defaults
+  // evidence is optional; only set fields that are present in the extension
   const e = ext.evidence || {};
-  const a = autoDetected || {};
-
   const hasBodyEl = document.getElementById("f-has-body-instruction");
   if (e.hasBodyInstruction != null) {
     hasBodyEl.checked = e.hasBodyInstruction;
     hasBodyEl.dataset.set = "1";
-  } else if (a.hasBodyInstruction != null) {
-    hasBodyEl.checked = a.hasBodyInstruction;
-    hasBodyEl.dataset.set = "1";
   }
-
   if (e.attachmentProfile != null) {
     document.getElementById("f-attachment-profile").value = e.attachmentProfile;
-  } else if (a.attachmentProfile) {
-    document.getElementById("f-attachment-profile").value = a.attachmentProfile;
   }
-
   if (e.evidenceSummary != null) {
     document.getElementById("f-evidence-summary").value = e.evidenceSummary;
-  } else if (a.evidenceSummary) {
-    document.getElementById("f-evidence-summary").value = a.evidenceSummary;
   }
-}
-
-function applyAutoDetected(autoDetected) {
-  const a = autoDetected || {};
-  const hasBodyEl = document.getElementById("f-has-body-instruction");
-  if (a.hasBodyInstruction != null) {
-    hasBodyEl.checked = a.hasBodyInstruction;
-    hasBodyEl.dataset.set = "1";
-  }
-  if (a.attachmentProfile) document.getElementById("f-attachment-profile").value = a.attachmentProfile;
-  if (a.evidenceSummary)   document.getElementById("f-evidence-summary").value   = a.evidenceSummary;
 }
 
 // ── Form persistence ──────────────────────────────────────────────────────────
@@ -235,10 +181,9 @@ async function getToken() {
 }
 
 // ── Graph prefill ─────────────────────────────────────────────────────────────
-async function prefillFromExtension(autoDetected) {
+async function prefillFromExtension() {
   const cached = getCachedToken();
   if (!cached) {
-    applyAutoDetected(autoDetected);
     document.getElementById("f-case-id").value     = generateCaseId();
     document.getElementById("f-case-status").value = "new";
     return;
@@ -253,9 +198,8 @@ async function prefillFromExtension(autoDetected) {
     );
     const ext = await readGraphExtension(cached, restId, EXTENSION_NAME);
     if (ext) {
-      populateFormFromExtension(ext, autoDetected);
+      populateFormFromExtension(ext);
     } else {
-      applyAutoDetected(autoDetected);
       document.getElementById("f-case-id").value     = generateCaseId();
       document.getElementById("f-case-status").value = "new";
       currentStateVersion = 0;
@@ -334,18 +278,7 @@ if (typeof Office !== "undefined") {
     });
 
     const hadPendingForm = restoreFormFromStorage();
-    if (hadPendingForm) return;
-
-    const attachments    = item.attachments || [];
-    const profile        = detectAttachmentProfile(attachments);
-    const summary        = buildEvidenceSummary(attachments, profile);
-    const hasInstruction = await detectBodyInstruction(item);
-
-    await prefillFromExtension({
-      hasBodyInstruction: hasInstruction,
-      attachmentProfile:  profile,
-      evidenceSummary:    summary,
-    });
+    if (!hadPendingForm) await prefillFromExtension();
   });
 } else {
   // ── Browser preview / testbed path ───────────────────────────────────────────
@@ -353,14 +286,8 @@ if (typeof Office !== "undefined") {
     initSelects();
     document.getElementById("ei-from").textContent    = "sender@example.com";
     document.getElementById("ei-subject").textContent = "[PREVIEW] Sample Email Subject";
-
-    document.getElementById("f-case-id").value     = generateCaseId();
-    document.getElementById("f-case-status").value = "new";
-    document.getElementById("f-attachment-profile").value = "pdf_and_excel";
-    document.getElementById("f-evidence-summary").value   = "2 attachments: PDF, Excel.";
-    const hasBodyEl = document.getElementById("f-has-body-instruction");
-    hasBodyEl.checked = true;
-    hasBodyEl.dataset.set = "1";
+    document.getElementById("f-case-id").value        = generateCaseId();
+    document.getElementById("f-case-status").value    = "new";
 
     document.getElementById("save-btn").addEventListener("click", () => {
       currentStateVersion++;
