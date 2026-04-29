@@ -7,7 +7,7 @@
   xsi:type="MailApp">
 
   <Id>9ae09e9d-a819-4648-bc06-9acca47dd5d5</Id>
-  <Version>0.1.0.0</Version>
+  <Version>1.0.0.0</Version>
   <ProviderName>rpapub</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Extension Inspector"/>
