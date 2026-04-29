@@ -6,32 +6,43 @@ const DIALOG_URL = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dial
 // Graph metadata fields to suppress in the rendered output
 const META = new Set(["@odata.type", "@odata.context", "@odata.etag", "id"]);
 
+const LOG = (...a) => console.log("[ExtInspector]", ...a);
+
 // ── Auth (same pattern as embed-data) ────────────────────────────────────────
 function getTokenViaDialog() {
   return new Promise((resolve, reject) => {
+    LOG("opening auth dialog:", DIALOG_URL);
     Office.context.ui.displayDialogAsync(
       DIALOG_URL,
       { height: 60, width: 30, promptBeforeOpen: false },
       (result) => {
+        LOG("displayDialogAsync callback, status:", result.status);
         if (result.status === Office.AsyncResultStatus.Failed) {
+          LOG("dialog open failed:", result.error);
           reject(new Error(`Dialog failed: ${result.error.message}`));
           return;
         }
         const dialog = result.value;
         dialog.addEventHandler(Office.EventType.DialogMessageReceived, (msg) => {
+          LOG("message from dialog:", msg.message);
           dialog.close();
           try {
             const payload = JSON.parse(msg.message);
-            if (payload.error) reject(new Error(payload.error));
-            else {
+            if (payload.error) {
+              LOG("auth error in payload:", payload.error);
+              reject(new Error(payload.error));
+            } else {
+              LOG("token received, expiresIn:", payload.expiresIn);
               cacheToken(payload.accessToken, payload.expiresIn ?? 3600);
               resolve(payload.accessToken);
             }
           } catch (e) {
+            LOG("failed to parse dialog message:", e);
             reject(new Error("Invalid message from auth dialog"));
           }
         });
         dialog.addEventHandler(Office.EventType.DialogEventReceived, (evt) => {
+          LOG("dialog event:", evt.error);
           if (evt.error === 12006) reject(new Error("Sign-in cancelled."));
         });
       }
@@ -41,6 +52,7 @@ function getTokenViaDialog() {
 
 async function getToken() {
   const cached = getCachedToken();
+  LOG("cached token present:", !!cached);
   if (cached) return cached;
   return getTokenViaDialog();
 }
@@ -49,12 +61,15 @@ async function getToken() {
 // Use $expand instead of navigating /extensions directly — the navigation
 // property endpoint returns 405 for personal MSA (hotmail/outlook.com) accounts.
 async function fetchExtensions(token, restMessageId) {
-  const res = await fetch(
-    `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}?$expand=extensions&$select=id,extensions`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  if (!res.ok) throw new Error(`Graph ${res.status}: ${await res.text().catch(() => "")}`);
-  const json = await res.json();
+  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}?$expand=extensions&$select=id,extensions`;
+  LOG("fetching:", url);
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  LOG("response status:", res.status, res.statusText);
+  const text = await res.text();
+  LOG("response body:", text);
+  if (!res.ok) throw new Error(`Graph ${res.status}: ${text}`);
+  const json = JSON.parse(text);
+  LOG("extensions array:", json.extensions);
   return json.extensions ?? [];
 }
 
@@ -137,15 +152,18 @@ function setStatus(msg, isError) {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 Office.onReady(async () => {
+  LOG("Office.onReady fired");
   try {
     const item = Office.context.mailbox.item;
     document.getElementById("ei-from").textContent    = item.from?.emailAddress ?? "—";
     document.getElementById("ei-subject").textContent = item.subject ?? "—";
 
+    LOG("ewsId (raw):", item.itemId);
     const restId = Office.context.mailbox.convertToRestId(
       item.itemId,
       Office.MailboxEnums.RestVersion.v2_0
     );
+    LOG("restId:", restId);
 
     setStatus("Authenticating…");
     const token = await getToken();
