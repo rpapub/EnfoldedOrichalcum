@@ -122,6 +122,22 @@
     }
 
     .empty { color: var(--base1); font-size: 12px; font-style: italic; }
+
+    /* MSA fallback manual lookup */
+    .msa-note {
+      font-size: 11px; color: var(--base1); margin-bottom: 8px; line-height: 1.4;
+    }
+    .lookup-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .lookup-row input {
+      flex: 1; padding: 4px 7px; border: 1px solid var(--base1); border-radius: 2px;
+      font-size: 12px; font-family: inherit; background: var(--base3); color: var(--base00);
+    }
+    .lookup-row input:focus {
+      outline: none; border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue);
+    }
+    .lookup-row button {
+      margin: 0; width: auto; padding: 4px 10px; font-size: 12px;
+    }
   </style>
 </head>
 <body>
@@ -135,10 +151,20 @@
     </div>
 
     <div id="status">Loading…</div>
+    <div id="msa-fallback" style="display:none">
+      <p class="msa-note">
+        Personal Microsoft accounts don't support listing all extensions at once.
+        Enter a known extension name to look it up:
+      </p>
+      <div class="lookup-row">
+        <input type="text" id="ext-name-input" placeholder="net.example.myExtension"/>
+        <button id="lookup-btn">Look up</button>
+      </div>
+    </div>
     <div id="extensions-container"></div>
   </div>
 
-  <script src="../../shared/graph-utils.js?v=4"></script>
-  <script src="taskpane.js?v=4"></script>
+  <script src="../../shared/graph-utils.js?v=5"></script>
+  <script src="taskpane.js?v=5"></script>
 </body>
 </html>

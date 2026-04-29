@@ -3,12 +3,11 @@
 const CLIENT_ID  = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
 const DIALOG_URL = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dialog.html";
 
-// Graph metadata fields to suppress in the rendered output
 const META = new Set(["@odata.type", "@odata.context", "@odata.etag", "id"]);
 
 const LOG = (...a) => console.log("[ExtInspector]", ...a);
 
-// ── Auth (same pattern as embed-data) ────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 function getTokenViaDialog() {
   return new Promise((resolve, reject) => {
     LOG("opening auth dialog:", DIALOG_URL);
@@ -58,23 +57,41 @@ async function getToken() {
 }
 
 // ── Graph ────────────────────────────────────────────────────────────────────
-// Use $expand instead of navigating /extensions directly — the navigation
-// property endpoint returns 405 for personal MSA (hotmail/outlook.com) accounts.
-async function fetchExtensions(token, restMessageId) {
-  // $filter on the expand is mandatory; startswith(id,'') matches any extension id.
-  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}?$expand=extensions($filter=startswith(id,''))&$select=id,extensions`;
-  LOG("fetching:", url);
+async function fetchAllExtensions(token, restMessageId) {
+  // The /extensions navigation property is the correct endpoint for listing all
+  // extensions. It works for work/school accounts. Personal MSA accounts return
+  // 405 — in that case we surface the manual lookup UI instead.
+  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
+  LOG("fetching all extensions:", url);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  LOG("response status:", res.status, res.statusText);
+  LOG("response status:", res.status);
+  if (res.ok) {
+    const json = await res.json();
+    LOG("extensions:", json.value);
+    return { extensions: json.value ?? [], msaLimit: false };
+  }
+  if (res.status === 405) {
+    LOG("405 — personal MSA account; nav property not supported");
+    return { extensions: [], msaLimit: true };
+  }
+  const text = await res.text();
+  LOG("response body:", text);
+  throw new Error(`Graph ${res.status}: ${text}`);
+}
+
+async function fetchExtensionByName(token, restMessageId, name) {
+  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions/${encodeURIComponent(name)}`;
+  LOG("fetching by name:", url);
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  LOG("response status:", res.status);
+  if (res.status === 404) return null;
   const text = await res.text();
   LOG("response body:", text);
   if (!res.ok) throw new Error(`Graph ${res.status}: ${text}`);
-  const json = JSON.parse(text);
-  LOG("extensions array:", json.extensions);
-  return json.extensions ?? [];
+  return JSON.parse(text);
 }
 
-// ── Rendering ────────────────────────────────────────────────────────────────
+// ── Rendering ─────────────────────────────────────────────────────────────────
 function renderValue(val, depth) {
   if (val === null) return document.createTextNode("null");
   if (Array.isArray(val)) return renderArray(val, depth);
@@ -85,13 +102,10 @@ function renderValue(val, depth) {
 function renderObject(obj, depth) {
   const keys = Object.keys(obj).filter(k => !META.has(k));
   if (keys.length === 0) return document.createTextNode("{}");
-
   const wrap = document.createElement("div");
   wrap.className = depth > 0 ? "nested" : "";
-
   const table = document.createElement("table");
   table.className = "kv-table";
-
   keys.forEach(k => {
     const tr = document.createElement("tr");
     const tdKey = document.createElement("td");
@@ -104,14 +118,12 @@ function renderObject(obj, depth) {
     tr.appendChild(tdVal);
     table.appendChild(tr);
   });
-
   wrap.appendChild(table);
   return wrap;
 }
 
 function renderArray(arr, depth) {
   if (arr.length === 0) return document.createTextNode("[]");
-
   const wrap = document.createElement("div");
   arr.forEach((item, i) => {
     const itemWrap = document.createElement("div");
@@ -131,17 +143,14 @@ function renderArray(arr, depth) {
 function renderExtension(ext) {
   const card = document.createElement("div");
   card.className = "ext-card";
-
   const header = document.createElement("div");
   header.className = "ext-card-header";
   header.textContent = ext.id ?? "(unknown extension)";
   card.appendChild(header);
-
   const body = document.createElement("div");
   body.className = "ext-card-body";
   body.appendChild(renderObject(ext, 0));
   card.appendChild(body);
-
   return card;
 }
 
@@ -149,6 +158,10 @@ function setStatus(msg, isError) {
   const el = document.getElementById("status");
   el.textContent = msg;
   el.className = isError ? "error" : "";
+}
+
+function appendExtension(ext) {
+  document.getElementById("extensions-container").appendChild(renderExtension(ext));
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -170,22 +183,46 @@ Office.onReady(async () => {
     const token = await getToken();
 
     setStatus("Loading extensions…");
-    const extensions = await fetchExtensions(token, restId);
+    const { extensions, msaLimit } = await fetchAllExtensions(token, restId);
 
-    const container = document.getElementById("extensions-container");
+    if (msaLimit) {
+      // Personal MSA accounts: surface the manual lookup UI
+      setStatus("");
+      document.getElementById("msa-fallback").style.display = "block";
+      document.getElementById("lookup-btn").addEventListener("click", async () => {
+        const name = document.getElementById("ext-name-input").value.trim();
+        if (!name) return;
+        setStatus("Looking up…");
+        document.getElementById("extensions-container").innerHTML = "";
+        try {
+          const ext = await fetchExtensionByName(token, restId, name);
+          setStatus("");
+          if (!ext) {
+            setStatus(`No extension found: ${name}`, true);
+          } else {
+            appendExtension(ext);
+          }
+        } catch (e) {
+          setStatus(e.message || "Lookup failed.", true);
+          LOG("lookup error:", e);
+        }
+      });
+      return;
+    }
+
     if (extensions.length === 0) {
       setStatus("");
       const empty = document.createElement("p");
       empty.className = "empty";
       empty.textContent = "No extensions found on this message.";
-      container.appendChild(empty);
+      document.getElementById("extensions-container").appendChild(empty);
       return;
     }
 
     setStatus("");
-    extensions.forEach(ext => container.appendChild(renderExtension(ext)));
+    extensions.forEach(appendExtension);
   } catch (e) {
     setStatus(e.message || "Failed to load extensions.", true);
-    console.error(e);
+    LOG("error:", e);
   }
 });
