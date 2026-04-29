@@ -3,7 +3,7 @@
   "private": true,
   "devDependencies": {
     "eslint": "^9",
-    "vitest": "^2"
+    "vitest": "^4.1.5"
   },
   "scripts": {
     "test:unit": "vitest run --reporter=verbose"
