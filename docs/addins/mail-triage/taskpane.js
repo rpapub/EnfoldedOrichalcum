@@ -201,8 +201,9 @@ async function getToken() {
 async function prefillFromExtension() {
   const cached = getCachedToken();
   if (!cached) {
-    document.getElementById("f-case-id").value     = generateCaseId();
-    document.getElementById("f-case-status").value = "new";
+    document.getElementById("f-case-id").value       = generateCaseId();
+    document.getElementById("f-case-status").value   = "new";
+    document.getElementById("f-state-version").value = "1";
     return;
   }
   const statusEl = document.getElementById("status");
@@ -217,8 +218,9 @@ async function prefillFromExtension() {
     if (ext) {
       populateFormFromExtension(ext);
     } else {
-      document.getElementById("f-case-id").value     = generateCaseId();
-      document.getElementById("f-case-status").value = "new";
+      document.getElementById("f-case-id").value          = generateCaseId();
+      document.getElementById("f-case-status").value      = "new";
+      document.getElementById("f-state-version").value    = "1";
       currentStateVersion = 0;
     }
   } catch (e) {
