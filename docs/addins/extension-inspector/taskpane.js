@@ -145,7 +145,8 @@ function renderExtension(ext) {
   card.className = "ext-card";
   const header = document.createElement("div");
   header.className = "ext-card-header";
-  header.textContent = ext.id ?? "(unknown extension)";
+  const rawId = ext.id ?? "(unknown extension)";
+  header.textContent = rawId.replace(/^Microsoft\.OutlookServices\.OpenTypeExtension\./, "");
   card.appendChild(header);
   const body = document.createElement("div");
   body.className = "ext-card-body";
