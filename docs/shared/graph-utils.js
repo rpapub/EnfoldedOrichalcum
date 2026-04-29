@@ -29,10 +29,18 @@ function graphError(status, text) {
 
 async function readGraphExtension(token, restMessageId, extensionName) {
   const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions/${encodeURIComponent(extensionName)}`;
+  console.log("[graph] GET", url);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  console.log("[graph] GET status", res.status);
   if (res.status === 404) return null;
-  if (!res.ok) throw graphError(res.status, `Graph ${res.status}`);
-  return res.json();
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error("[graph] GET error body", detail);
+    throw graphError(res.status, `Graph ${res.status}`);
+  }
+  const json = await res.json();
+  console.log("[graph] GET response", json);
+  return json;
 }
 
 async function deleteGraphExtension(token, restMessageId, extensionId) {
@@ -45,26 +53,39 @@ async function deleteGraphExtension(token, restMessageId, extensionId) {
 
 async function writeGraphExtension(token, restMessageId, extensionName, data) {
   const baseUrl = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
-  const body = JSON.stringify({
+  const payload = {
     "@odata.type": "microsoft.graph.openTypeExtension",
     extensionName,
     ...data
-  });
+  };
+  const body = JSON.stringify(payload);
   const headers = {
     "Authorization": `Bearer ${token}`,
     "Content-Type": "application/json"
   };
 
+  console.log("[graph] POST", baseUrl);
+  console.log("[graph] body", payload);
+
   let res = await fetch(baseUrl, { method: "POST", headers, body });
+  console.log("[graph] POST status", res.status);
 
   if (res.status === 409) {
-    res = await fetch(`${baseUrl}/${extensionName}`, { method: "PATCH", headers, body });
-    if (res.status !== 204) throw graphError(res.status, `Extension update failed: ${res.status}`);
+    const patchUrl = `${baseUrl}/${extensionName}`;
+    console.log("[graph] 409 → PATCH", patchUrl);
+    res = await fetch(patchUrl, { method: "PATCH", headers, body });
+    console.log("[graph] PATCH status", res.status);
+    if (res.status !== 204) {
+      const detail = await res.text().catch(() => "");
+      console.error("[graph] PATCH error body", detail);
+      throw graphError(res.status, `Extension update failed: ${res.status}`);
+    }
     return;
   }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
+    console.error("[graph] POST error body", detail);
     throw graphError(res.status, detail);
   }
 }
