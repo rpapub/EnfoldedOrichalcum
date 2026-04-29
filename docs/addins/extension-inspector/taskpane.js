@@ -1,7 +1,9 @@
 /* global Office, getCachedToken, cacheToken, clearCachedToken, graphError, deleteGraphExtension */
 
-const CLIENT_ID  = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
-const DIALOG_URL = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dialog.html";
+const CLIENT_ID       = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
+const DIALOG_URL      = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dialog.html";
+const DEFAULT_EXT     = "net.cprima.rpapub.CPMForge.M365.extension";
+const LAST_EXT_KEY    = "ext_inspector_last_name";
 
 const META = new Set(["@odata.type", "@odata.context", "@odata.etag", "id"]);
 
@@ -263,6 +265,10 @@ Office.onReady(async () => {
       const input     = document.getElementById("ext-name-input");
       const container = document.getElementById("extensions-container");
 
+      // Restore last-used name; fall back to default
+      const savedName = localStorage.getItem(LAST_EXT_KEY);
+      input.value = savedName || DEFAULT_EXT;
+
       const doLookup = async () => {
         const name = input.value.trim();
         if (!name) return;
@@ -274,6 +280,7 @@ Office.onReady(async () => {
           if (!ext) {
             setStatus(`Not found: ${name}`, true);
           } else {
+            localStorage.setItem(LAST_EXT_KEY, name);
             const onDelete = async (extId) => {
               await deleteGraphExtension(token, restId, extId);
               setStatus("Extension deleted.");
