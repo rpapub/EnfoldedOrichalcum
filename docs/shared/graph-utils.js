@@ -17,6 +17,14 @@ function cacheToken(accessToken, expiresIn) {
   }));
 }
 
+async function readGraphExtension(token, restMessageId, extensionName) {
+  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions/${encodeURIComponent(extensionName)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Graph ${res.status}`);
+  return res.json();
+}
+
 async function writeGraphExtension(token, restMessageId, extensionName, data) {
   const baseUrl = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
   const body = JSON.stringify({

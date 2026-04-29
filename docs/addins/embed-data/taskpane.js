@@ -1,4 +1,4 @@
-/* global Office, getCachedToken, cacheToken, writeGraphExtension */
+/* global Office, getCachedToken, cacheToken, readGraphExtension, writeGraphExtension */
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 const CLIENT_ID      = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
@@ -47,6 +47,17 @@ function autoSelectQuarter(selectId) {
   document.getElementById(selectId).value = `Q${q}`;
 }
 
+function populateFormFromExtension(ext) {
+  const map = {
+    reference: "f-reference", category: "f-category", priority: "f-priority",
+    owner: "f-owner", notes: "f-notes", country: "f-country",
+    year: "f-year", quarter: "f-quarter"
+  };
+  Object.entries(map).forEach(([key, id]) => {
+    if (ext[key] != null && ext[key] !== "") document.getElementById(id).value = ext[key];
+  });
+}
+
 function buildOutput() {
   return {
     from:      document.getElementById("from").value,
@@ -83,7 +94,7 @@ function getTokenViaDialog() {
   return new Promise((resolve, reject) => {
     Office.context.ui.displayDialogAsync(
       DIALOG_URL,
-      { height: 60, width: 30, promptBeforeOpen: false },
+      { height: 60, width: 30, promptBeforeOpen: true },
       (result) => {
         if (result.status === Office.AsyncResultStatus.Failed) {
           reject(new Error(`Dialog failed: ${result.error.message}`));
@@ -142,11 +153,11 @@ function restoreFormFromStorage() {
 
 // ── Outlook (Office.js) path ──────────────────────────────────────────────────
 if (typeof Office !== "undefined") {
-  Office.onReady(() => {
+  Office.onReady(async () => {
     initForm();
 
+    const item = Office.context.mailbox.item;
     try {
-      const item = Office.context.mailbox.item;
       document.getElementById("from").value        = item.from ? item.from.emailAddress : "";
       document.getElementById("subject").value     = item.subject || "";
       document.getElementById("f-reference").value = item.subject || "";
@@ -155,8 +166,23 @@ if (typeof Office !== "undefined") {
       console.warn("Could not read email properties:", e);
     }
 
-    // Restore any form data saved before the auth redirect reloaded the task pane
-    restoreFormFromStorage();
+    // Restore any form data saved before the auth redirect reloaded the task pane.
+    // If there was pending data, skip the Graph read (user was mid-edit).
+    const hadPendingForm = restoreFormFromStorage();
+
+    if (!hadPendingForm) {
+      const cached = getCachedToken();
+      if (cached) {
+        try {
+          const restId = Office.context.mailbox.convertToRestId(
+            item.itemId,
+            Office.MailboxEnums.RestVersion.v2_0
+          );
+          const ext = await readGraphExtension(cached, restId, EXTENSION_NAME);
+          if (ext) populateFormFromExtension(ext);
+        } catch (_) { /* silent — form stays at defaults */ }
+      }
+    }
 
     document.getElementById("save-btn").addEventListener("click", async () => {
       const btn = document.getElementById("save-btn");
