@@ -77,8 +77,23 @@
       word-break: break-all;
     }
 
-    /* Dynamic evidence key-value fields */
-    .ev-field label { color: var(--base1); font-style: italic; }
+    /* Evidence fields */
+    .ev-field { position: relative; }
+    .ev-field label { font-weight: 600; font-size: 12px; color: var(--base00); }
+    .ev-remove {
+      position: absolute; top: 0; right: 0;
+      display: inline-block; width: auto; margin: 0;
+      padding: 1px 6px; font-size: 10px; font-weight: 400; letter-spacing: 0;
+      background: var(--base1);
+    }
+    .ev-remove:hover { background: var(--red); }
+    .ev-bool-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+    .ev-bool-row input[type="checkbox"] { width: auto; margin: 0; }
+
+    .ev-add-row { display: flex; gap: 5px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+    .ev-add-row select,
+    .ev-add-row input[type="text"] { width: auto; flex: 1 1 60px; min-width: 0; font-size: 12px; padding: 4px 6px; }
+    .ev-add-btn { display: inline-block; width: auto; margin: 0; padding: 4px 10px; font-size: 12px; flex-shrink: 0; }
 
     button {
       display: block;
@@ -152,11 +167,9 @@
     </div>
 
     <h2>Evidence</h2>
-    <div class="field">
-      <label for="f-attachment-profile">Attachment Profile</label>
-      <select id="f-attachment-profile"></select>
+    <div id="evidence-fields">
+      <div id="evidence-add-row" class="ev-add-row"></div>
     </div>
-    <div id="evidence-extra"></div>
 
     <button id="save-btn">Save Triage</button>
     <div id="status" class="status"></div>
@@ -165,6 +178,6 @@
   </div><!-- /.form-body -->
 
   <script src="../../shared/graph-utils.js?v=3"></script>
-  <script src="taskpane.js?v=4"></script>
+  <script src="taskpane.js?v=5"></script>
 </body>
 </html>

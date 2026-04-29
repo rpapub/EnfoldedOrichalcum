@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rpapub.github.io/EnfoldedOrichalcum/addins/mail-triage/schema.json",
+  "title": "Mail Triage",
+  "description": "Schema for the net.cprima.rpapub.CPMForge.M365.triage Graph open extension",
+  "type": "object",
+  "required": ["caseId", "caseStatus", "stateVersion", "triage"],
+  "properties": {
+    "caseId": {
+      "type": "string",
+      "title": "Case ID",
+      "description": "Unique case identifier, auto-generated as C + base36 timestamp"
+    },
+    "caseStatus": {
+      "type": "string",
+      "title": "Case Status",
+      "enum": ["new", "triaged", "in_progress", "resolved", "closed"]
+    },
+    "stateVersion": {
+      "type": "string",
+      "title": "State Version",
+      "description": "Monotonically incrementing version string, starts at 1"
+    },
+    "triage": {
+      "type": "object",
+      "title": "Triage",
+      "required": ["result", "confidence"],
+      "properties": {
+        "result": {
+          "type": "string",
+          "title": "Result",
+          "enum": ["no_action", "work_required", "information_only", "automated_candidate", "escalation_needed"]
+        },
+        "confidence": {
+          "type": "string",
+          "title": "Confidence",
+          "enum": ["low", "medium", "high"]
+        },
+        "summary": {
+          "type": "string",
+          "title": "Summary"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "title": "Evidence",
+      "description": "Optional; any additional properties are allowed — bot or human can write arbitrary keys",
+      "additionalProperties": true,
+      "properties": {
+        "attachmentProfile": {
+          "type": "string",
+          "title": "Attachment Profile",
+          "enum": ["none", "pdf_only", "excel_only", "pdf_and_excel", "mixed", "other"],
+          "x-default": true
+        },
+        "hasBodyInstruction": {
+          "type": "boolean",
+          "title": "Has Body Instruction"
+        },
+        "evidenceSummary": {
+          "type": "string",
+          "title": "Evidence Summary"
+        }
+      }
+    }
+  }
+}

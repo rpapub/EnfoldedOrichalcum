@@ -144,6 +144,27 @@
       border-radius: 0 2px 2px 0;
     }
 
+    /* Evidence fields */
+    .ev-field { position: relative; }
+    .ev-remove {
+      position: absolute; top: 0; right: 0;
+      display: inline-block; width: auto; margin: 0;
+      padding: 1px 5px; font-size: 10px; font-weight: 400; letter-spacing: 0;
+      background: var(--base1); color: #fff; border: none; cursor: pointer; border-radius: 1px;
+    }
+    .ev-remove:hover { background: var(--red); }
+    .ev-bool-row { display: flex; align-items: center; gap: 5px; padding: 3px 0; }
+    .ev-bool-row input[type="checkbox"] { width: auto; margin: 0; }
+    .ev-add-row { display: flex; gap: 5px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+    .ev-add-row select,
+    .ev-add-row input[type="text"] { width: auto; flex: 1 1 60px; min-width: 0; font-size: 11px; padding: 3px 5px; background: #fff; }
+    .ev-add-btn {
+      display: inline-block; width: auto; margin: 0; padding: 4px 8px; font-size: 12px;
+      flex-shrink: 0; background: var(--orange); color: #fff; border: none; cursor: pointer;
+      border-radius: 2px; font-weight: 700;
+    }
+    .ev-add-btn:hover { background: #a93d10; }
+
     @media (max-width: 600px) {
       .preview-wrap { flex: 0 0 100%; }
     }
@@ -204,11 +225,9 @@
       </div>
 
       <h2>Evidence</h2>
-      <div class="field">
-        <label for="f-attachment-profile">Attachment Profile</label>
-        <select id="f-attachment-profile"></select>
+      <div id="evidence-fields">
+        <div id="evidence-add-row" class="ev-add-row"></div>
       </div>
-      <div id="evidence-extra"></div>
 
       <button class="save-btn" id="save-btn">Save Triage — Preview</button>
       <pre id="preview-output"></pre>

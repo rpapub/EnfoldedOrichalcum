@@ -4,11 +4,31 @@ const CLIENT_ID        = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
 const EXTENSION_NAME   = "net.cprima.rpapub.CPMForge.M365.triage";
 const DIALOG_URL       = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dialog.html";
 const FORM_STORAGE_KEY = "mail_triage_pending_form";
-
-// Keys not rendered as freeform evidence fields
-const EVIDENCE_SKIP = new Set(["attachmentProfile", "@odata.type", "@odata.context", "@odata.etag", "id"]);
+const SCHEMA_URL       = "schema.json";
+const GRAPH_META       = new Set(["@odata.type", "@odata.context", "@odata.etag", "id"]);
 
 let currentStateVersion = 0;
+let triageSchema = null;
+
+// ── Schema ────────────────────────────────────────────────────────────────────
+async function loadSchema() {
+  try {
+    const r = await fetch(SCHEMA_URL);
+    triageSchema = await r.json();
+  } catch (_) {
+    triageSchema = { properties: {} };
+  }
+}
+
+function evidenceProp(key) {
+  try { return triageSchema.properties.evidence.properties[key] || null; }
+  catch (_) { return null; }
+}
+
+function evidenceProps() {
+  try { return triageSchema.properties.evidence.properties || {}; }
+  catch (_) { return {}; }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function generateCaseId() {
@@ -31,7 +51,6 @@ function initSelects() {
     ["new","new"], ["triaged","triaged"], ["in_progress","in_progress"],
     ["resolved","resolved"], ["closed","closed"]
   ]);
-  // no_action and low first — sensible defaults for an untriaged message
   populateSelect("f-triage-result", [
     ["no_action","no_action"], ["work_required","work_required"],
     ["information_only","information_only"], ["automated_candidate","automated_candidate"],
@@ -39,11 +58,6 @@ function initSelects() {
   ]);
   populateSelect("f-triage-confidence", [
     ["low","low"], ["medium","medium"], ["high","high"]
-  ]);
-  populateSelect("f-attachment-profile", [
-    ["","— not set —"],
-    ["none","none"], ["pdf_only","pdf_only"], ["excel_only","excel_only"],
-    ["pdf_and_excel","pdf_and_excel"], ["mixed","mixed"], ["other","other"]
   ]);
 }
 
@@ -54,43 +68,199 @@ function showStatus(msg, isError) {
   if (!isError) setTimeout(() => { el.textContent = ""; el.className = "status"; }, 4000);
 }
 
-// ── Dynamic evidence key-value fields ────────────────────────────────────────
-function renderExtraEvidence(evidence) {
-  const container = document.getElementById("evidence-extra");
-  container.innerHTML = "";
-  Object.entries(evidence).forEach(([key, val]) => {
-    if (EVIDENCE_SKIP.has(key)) return;
-    const div = document.createElement("div");
-    div.className = "field ev-field";
-    const lbl = document.createElement("label");
-    lbl.textContent = key;
-    const input = document.createElement("input");
+// ── Evidence fields ───────────────────────────────────────────────────────────
+function shownEvidenceKeys() {
+  const keys = new Set();
+  document.querySelectorAll("#evidence-fields [data-ev-key]").forEach(el => keys.add(el.dataset.evKey));
+  return keys;
+}
+
+function appendEvidenceField(key, val, customType) {
+  const container = document.getElementById("evidence-fields");
+  if (container.querySelector(`[data-ev-key="${CSS.escape(key)}"]`)) return;
+
+  const prop = evidenceProp(key);
+  const type = prop ? prop.type : (customType || "string");
+  const title = (prop && prop.title) ? prop.title : key;
+
+  const div = document.createElement("div");
+  div.className = "field ev-field";
+  div.dataset.evKey = key;
+
+  const lbl = document.createElement("label");
+  lbl.textContent = title;
+
+  const rm = document.createElement("button");
+  rm.type = "button";
+  rm.className = "ev-remove";
+  rm.textContent = "x";
+  rm.title = "Remove";
+  rm.addEventListener("click", () => { div.remove(); refreshAddRow(); });
+
+  let input;
+  if (prop && prop.enum) {
+    input = document.createElement("select");
+    input.dataset.evKey = key;
+    const blank = document.createElement("option");
+    blank.value = ""; blank.textContent = "-- not set --";
+    input.appendChild(blank);
+    prop.enum.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v; opt.textContent = v;
+      input.appendChild(opt);
+    });
+    if (val != null && val !== "") input.value = String(val);
+  } else if (type === "boolean") {
+    const row = document.createElement("div");
+    row.className = "ev-bool-row";
+    input = document.createElement("input");
+    input.type = "checkbox";
+    input.dataset.evKey = key;
+    if (val === true || val === "true") input.checked = true;
+    row.appendChild(input);
+    div.appendChild(lbl);
+    div.appendChild(row);
+    div.appendChild(rm);
+    container.insertBefore(div, document.getElementById("evidence-add-row"));
+    refreshAddRow();
+    return;
+  } else if (type === "integer") {
+    input = document.createElement("input");
+    input.type = "number";
+    input.step = "1";
+    input.dataset.evKey = key;
+    if (val != null) input.value = String(val);
+  } else {
+    input = document.createElement("input");
     input.type = "text";
     input.dataset.evKey = key;
-    input.value = val == null ? "" : String(val);
-    div.appendChild(lbl);
-    div.appendChild(input);
-    container.appendChild(div);
+    if (val != null) input.value = String(val);
+  }
+
+  div.appendChild(lbl);
+  div.appendChild(input);
+  div.appendChild(rm);
+  container.insertBefore(div, document.getElementById("evidence-add-row"));
+  refreshAddRow();
+}
+
+function addDefaultEvidenceFields() {
+  const props = evidenceProps();
+  Object.entries(props).forEach(([key, prop]) => {
+    if (prop["x-default"]) appendEvidenceField(key, null);
   });
 }
 
-function collectExtraEvidence() {
+// ── Attachment detection ──────────────────────────────────────────────────────
+function detectAttachmentProfile(attachments) {
+  if (!attachments || attachments.length === 0) return "none";
+  const files = attachments.filter(a => !a.isInline);
+  if (files.length === 0) return "none";
+  const names = files.map(a => (a.name || "").toLowerCase());
+  const hasPdf   = names.some(n => n.endsWith(".pdf"));
+  const hasExcel = names.some(n => /\.(xlsx?|xlsm|xlsb)$/.test(n));
+  const hasOther = names.some(n => !/\.(pdf|xlsx?|xlsm|xlsb)$/.test(n));
+  if (hasPdf && hasExcel && !hasOther) return "pdf_and_excel";
+  if (hasPdf && !hasExcel && !hasOther) return "pdf_only";
+  if (!hasPdf && hasExcel && !hasOther) return "excel_only";
+  if (hasOther && (hasPdf || hasExcel)) return "mixed";
+  return "other";
+}
+
+function applyDetectedAttachmentProfile(item) {
+  if (document.querySelector('#evidence-fields [data-ev-key="attachmentProfile"]')) return;
+  const profile = detectAttachmentProfile(item.attachments);
+  appendEvidenceField("attachmentProfile", profile);
+}
+
+function refreshAddRow() {
+  const row = document.getElementById("evidence-add-row");
+  row.innerHTML = "";
+
+  const shown = shownEvidenceKeys();
+  const props = evidenceProps();
+  const available = Object.keys(props).filter(k => !shown.has(k));
+
+  const fieldSel = document.createElement("select");
+  fieldSel.className = "ev-add-select";
+  const ph = document.createElement("option");
+  ph.value = ""; ph.textContent = "Add field...";
+  fieldSel.appendChild(ph);
+  available.forEach(key => {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = props[key].title || key;
+    fieldSel.appendChild(opt);
+  });
+  const custOpt = document.createElement("option");
+  custOpt.value = "__custom__"; custOpt.textContent = "Custom...";
+  fieldSel.appendChild(custOpt);
+
+  const customKeyInput = document.createElement("input");
+  customKeyInput.type = "text";
+  customKeyInput.placeholder = "key name";
+  customKeyInput.className = "ev-custom-key";
+  customKeyInput.style.display = "none";
+
+  const typeSel = document.createElement("select");
+  typeSel.className = "ev-type-select";
+  typeSel.style.display = "none";
+  [["string","text"], ["integer","integer"], ["boolean","boolean"]].forEach(([v,l]) => {
+    const opt = document.createElement("option");
+    opt.value = v; opt.textContent = l;
+    typeSel.appendChild(opt);
+  });
+
+  fieldSel.addEventListener("change", () => {
+    const isCustom = fieldSel.value === "__custom__";
+    customKeyInput.style.display = isCustom ? "" : "none";
+    typeSel.style.display = isCustom ? "" : "none";
+  });
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "ev-add-btn";
+  addBtn.textContent = "+";
+  addBtn.addEventListener("click", () => {
+    const v = fieldSel.value;
+    if (!v) return;
+    if (v === "__custom__") {
+      const k = customKeyInput.value.trim();
+      if (!k) { customKeyInput.focus(); return; }
+      appendEvidenceField(k, null, typeSel.value);
+    } else {
+      appendEvidenceField(v, null);
+    }
+    fieldSel.value = "";
+    customKeyInput.value = "";
+    customKeyInput.style.display = "none";
+    typeSel.style.display = "none";
+  });
+
+  row.appendChild(fieldSel);
+  row.appendChild(customKeyInput);
+  row.appendChild(typeSel);
+  row.appendChild(addBtn);
+}
+
+function collectEvidence() {
   const obj = {};
-  document.querySelectorAll("#evidence-extra input[data-ev-key]").forEach(input => {
-    if (input.value.trim() !== "") obj[input.dataset.evKey] = input.value.trim();
+  document.querySelectorAll("#evidence-fields [data-ev-key]").forEach(input => {
+    const key = input.dataset.evKey;
+    if (input.type === "checkbox") {
+      obj[key] = input.checked;
+    } else if (input.type === "number") {
+      if (input.value.trim() !== "") obj[key] = Number(input.value);
+    } else {
+      if (input.value.trim() !== "") obj[key] = input.value.trim();
+    }
   });
   return obj;
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────
 function buildOutput() {
-  const attachmentProfile = document.getElementById("f-attachment-profile").value;
-  const extraEvidence     = collectExtraEvidence();
-
-  const evidenceObj = {};
-  if (attachmentProfile) evidenceObj.attachmentProfile = attachmentProfile;
-  Object.assign(evidenceObj, extraEvidence);
-
+  const evidenceObj = collectEvidence();
   const out = {
     caseId:       document.getElementById("f-case-id").value.trim(),
     caseStatus:   document.getElementById("f-case-status").value,
@@ -110,7 +280,7 @@ function populateFormFromExtension(ext) {
   if (ext.caseId)     document.getElementById("f-case-id").value     = ext.caseId;
   if (ext.caseStatus) document.getElementById("f-case-status").value = ext.caseStatus;
   currentStateVersion = parseInt(ext.stateVersion || "0", 10);
-  document.getElementById("f-state-version").value = ext.stateVersion || "0";
+  document.getElementById("f-state-version").value = ext.stateVersion || "1";
 
   if (ext.triage) {
     if (ext.triage.result)          document.getElementById("f-triage-result").value     = ext.triage.result;
@@ -118,26 +288,24 @@ function populateFormFromExtension(ext) {
     if (ext.triage.summary != null) document.getElementById("f-triage-summary").value    = ext.triage.summary;
   }
 
-  // evidence is optional; render whatever keys exist — attachmentProfile gets its dropdown,
-  // everything else becomes a freeform text field
   if (ext.evidence) {
-    const { attachmentProfile, ...rest } = ext.evidence;
-    if (attachmentProfile != null) document.getElementById("f-attachment-profile").value = attachmentProfile;
-    renderExtraEvidence(rest);
+    Object.entries(ext.evidence).forEach(([key, val]) => {
+      if (GRAPH_META.has(key)) return;
+      appendEvidenceField(key, val);
+    });
   }
 }
 
 // ── Form persistence ──────────────────────────────────────────────────────────
 function saveFormToStorage() {
   localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify({
-    caseId:            document.getElementById("f-case-id").value,
-    caseStatus:        document.getElementById("f-case-status").value,
-    triageResult:      document.getElementById("f-triage-result").value,
-    triageConfidence:  document.getElementById("f-triage-confidence").value,
-    triageSummary:     document.getElementById("f-triage-summary").value,
-    attachmentProfile: document.getElementById("f-attachment-profile").value,
-    extraEvidence:     collectExtraEvidence(),
-    stateVersion:      currentStateVersion,
+    caseId:           document.getElementById("f-case-id").value,
+    caseStatus:       document.getElementById("f-case-status").value,
+    triageResult:     document.getElementById("f-triage-result").value,
+    triageConfidence: document.getElementById("f-triage-confidence").value,
+    triageSummary:    document.getElementById("f-triage-summary").value,
+    evidence:         collectEvidence(),
+    stateVersion:     currentStateVersion,
   }));
 }
 
@@ -151,8 +319,9 @@ function restoreFormFromStorage() {
     if (d.triageResult)     document.getElementById("f-triage-result").value     = d.triageResult;
     if (d.triageConfidence) document.getElementById("f-triage-confidence").value = d.triageConfidence;
     if (d.triageSummary != null) document.getElementById("f-triage-summary").value = d.triageSummary;
-    if (d.attachmentProfile) document.getElementById("f-attachment-profile").value = d.attachmentProfile;
-    if (d.extraEvidence && Object.keys(d.extraEvidence).length > 0) renderExtraEvidence(d.extraEvidence);
+    if (d.evidence) {
+      Object.entries(d.evidence).forEach(([key, val]) => appendEvidenceField(key, val));
+    }
     if (d.stateVersion != null) currentStateVersion = parseInt(d.stateVersion, 10);
     return true;
   } catch (_) { return false; }
@@ -199,34 +368,39 @@ async function getToken() {
 
 // ── Graph prefill ─────────────────────────────────────────────────────────────
 async function prefillFromExtension() {
+  const item = Office.context.mailbox.item;
   const cached = getCachedToken();
   if (!cached) {
     document.getElementById("f-case-id").value       = generateCaseId();
     document.getElementById("f-case-status").value   = "new";
     document.getElementById("f-state-version").value = "1";
+    applyDetectedAttachmentProfile(item);
     return;
   }
   const statusEl = document.getElementById("status");
-  statusEl.textContent = "Loading…";
+  statusEl.textContent = "Loading...";
   statusEl.className = "status";
   try {
     const restId = Office.context.mailbox.convertToRestId(
-      Office.context.mailbox.item.itemId,
+      item.itemId,
       Office.MailboxEnums.RestVersion.v2_0
     );
     const ext = await readGraphExtension(cached, restId, EXTENSION_NAME);
     if (ext) {
       populateFormFromExtension(ext);
+      // fill attachmentProfile only if the stored extension didn't include it
+      applyDetectedAttachmentProfile(item);
     } else {
       document.getElementById("f-case-id").value          = generateCaseId();
       document.getElementById("f-case-status").value      = "new";
       document.getElementById("f-state-version").value    = "1";
       currentStateVersion = 0;
+      applyDetectedAttachmentProfile(item);
     }
   } catch (e) {
     if (e.status === 401) clearCachedToken();
   } finally {
-    if (statusEl.textContent === "Loading…") {
+    if (statusEl.textContent === "Loading...") {
       statusEl.textContent = "";
       statusEl.className = "status";
     }
@@ -249,11 +423,13 @@ if (typeof Office !== "undefined") {
       taglines[new Date().getHours() % taglines.length];
 
     initSelects();
+    await loadSchema();
+    refreshAddRow();
 
     const item = Office.context.mailbox.item;
     try {
-      document.getElementById("ei-from").textContent    = item.from ? item.from.emailAddress : "—";
-      document.getElementById("ei-subject").textContent = item.subject || "—";
+      document.getElementById("ei-from").textContent    = item.from ? item.from.emailAddress : "--";
+      document.getElementById("ei-subject").textContent = item.subject || "--";
     } catch (e) {
       console.warn("Could not read email properties:", e);
     }
@@ -261,11 +437,11 @@ if (typeof Office !== "undefined") {
     document.getElementById("save-btn").addEventListener("click", async () => {
       const btn = document.getElementById("save-btn");
       btn.disabled = true;
-      showStatus("Authenticating…", false);
+      showStatus("Authenticating...", false);
       saveFormToStorage();
       try {
         const token = await getToken();
-        showStatus("Saving…", false);
+        showStatus("Saving...", false);
         currentStateVersion++;
         const data = buildOutput();
         localStorage.removeItem(FORM_STORAGE_KEY);
@@ -280,7 +456,7 @@ if (typeof Office !== "undefined") {
         currentStateVersion--;
         if (e.status === 401) {
           clearCachedToken();
-          showStatus("Session expired — please sign in again and retry.", true);
+          showStatus("Session expired -- please sign in again and retry.", true);
         } else {
           showStatus(e.message || "Save failed.", true);
         }
@@ -301,12 +477,15 @@ if (typeof Office !== "undefined") {
   });
 } else {
   // ── Browser preview / testbed path ───────────────────────────────────────────
-  document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", async () => {
     initSelects();
+    await loadSchema();
+    refreshAddRow();
     document.getElementById("ei-from").textContent    = "sender@example.com";
     document.getElementById("ei-subject").textContent = "[PREVIEW] Sample Email Subject";
     document.getElementById("f-case-id").value        = generateCaseId();
     document.getElementById("f-case-status").value    = "new";
+    addDefaultEvidenceFields();
 
     document.getElementById("save-btn").addEventListener("click", () => {
       currentStateVersion++;

@@ -28,8 +28,7 @@ def test_testbed_title(testbed):
 
 def test_testbed_form_fields_present(testbed):
     for field_id in ("f-case-id", "f-case-status", "f-state-version",
-                     "f-triage-result", "f-triage-confidence", "f-triage-summary",
-                     "f-attachment-profile"):
+                     "f-triage-result", "f-triage-confidence", "f-triage-summary"):
         expect(testbed.locator(f"#{field_id}")).to_be_visible()
 
 
@@ -43,8 +42,14 @@ def test_case_status_includes_triaged(testbed):
     expect(option).to_have_count(1)
 
 
+def test_attachment_profile_field_present(testbed):
+    # attachmentProfile has x-default:true in schema so it renders automatically
+    field = testbed.locator('[data-ev-key="attachmentProfile"]')
+    expect(field).to_be_visible()
+
+
 def test_attachment_profile_includes_pdf_and_excel(testbed):
-    option = testbed.locator("#f-attachment-profile option[value='pdf_and_excel']")
+    option = testbed.locator('[data-ev-key="attachmentProfile"] option[value="pdf_and_excel"]')
     expect(option).to_have_count(1)
 
 
@@ -85,5 +90,5 @@ def test_taskpane_html_loads(page: Page):
 def test_taskpane_has_triage_fields(page: Page):
     page.goto(f"{BASE}/taskpane.html", wait_until="domcontentloaded")
     for field_id in ("f-case-id", "f-case-status", "f-triage-result",
-                     "f-triage-confidence", "f-triage-summary", "f-attachment-profile"):
+                     "f-triage-confidence", "f-triage-summary"):
         expect(page.locator(f"#{field_id}")).to_be_attached()
