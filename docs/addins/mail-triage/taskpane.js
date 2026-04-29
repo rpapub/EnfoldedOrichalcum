@@ -14,6 +14,7 @@ let triageSchema = null;
 async function loadSchema() {
   try {
     const r = await fetch(SCHEMA_URL);
+    if (!r.ok) throw new Error(`schema fetch ${r.status}`);
     triageSchema = await r.json();
   } catch (_) {
     triageSchema = { properties: {} };
@@ -85,7 +86,6 @@ function appendEvidenceField(key, val, customType) {
 
   const div = document.createElement("div");
   div.className = "field ev-field";
-  div.dataset.evKey = key;
 
   const lbl = document.createElement("label");
   lbl.textContent = title;
