@@ -123,9 +123,9 @@
 
     .empty { color: var(--base1); font-size: 12px; font-style: italic; }
 
-    /* MSA fallback manual lookup */
-    .msa-note {
-      font-size: 11px; color: var(--base1); margin-bottom: 8px; line-height: 1.4;
+    /* Extension name lookup */
+    .lookup-label {
+      font-size: 11px; color: var(--base1); margin-bottom: 4px;
     }
     .lookup-row { display: flex; gap: 6px; margin-bottom: 10px; }
     .lookup-row input {
@@ -152,19 +152,16 @@
 
     <div id="status">Loading…</div>
     <div id="msa-fallback" style="display:none">
-      <p class="msa-note">
-        Personal Microsoft accounts don't support listing all extensions at once.
-        Enter a known extension name to look it up:
-      </p>
+      <p class="lookup-label">Extension name</p>
       <div class="lookup-row">
-        <input type="text" id="ext-name-input" value="net.cprima.rpapub.CPMForge.M365.extension"/>
+        <input type="text" id="ext-name-input" placeholder="e.g. net.example.myextension" value="net.cprima.rpapub.EnfoldedOrichalcum"/>
         <button id="lookup-btn">Look up</button>
       </div>
     </div>
     <div id="extensions-container"></div>
   </div>
 
-  <script src="../../shared/graph-utils.js?v=8"></script>
-  <script src="taskpane.js?v=8"></script>
+  <script src="../../shared/graph-utils.js?v=9"></script>
+  <script src="taskpane.js?v=9"></script>
 </body>
 </html>

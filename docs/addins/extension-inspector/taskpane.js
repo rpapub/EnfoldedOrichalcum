@@ -5,43 +5,33 @@ const DIALOG_URL = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dial
 
 const META = new Set(["@odata.type", "@odata.context", "@odata.etag", "id"]);
 
-const LOG = (...a) => console.log("[ExtInspector]", ...a);
-
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function getTokenViaDialog() {
   return new Promise((resolve, reject) => {
-    LOG("opening auth dialog:", DIALOG_URL);
     Office.context.ui.displayDialogAsync(
       DIALOG_URL,
-      { height: 60, width: 30, promptBeforeOpen: false },
+      { height: 60, width: 30, promptBeforeOpen: true },
       (result) => {
-        LOG("displayDialogAsync callback, status:", result.status);
         if (result.status === Office.AsyncResultStatus.Failed) {
-          LOG("dialog open failed:", result.error);
           reject(new Error(`Dialog failed: ${result.error.message}`));
           return;
         }
         const dialog = result.value;
         dialog.addEventHandler(Office.EventType.DialogMessageReceived, (msg) => {
-          LOG("message from dialog:", msg.message);
           dialog.close();
           try {
             const payload = JSON.parse(msg.message);
             if (payload.error) {
-              LOG("auth error in payload:", payload.error);
               reject(new Error(payload.error));
             } else {
-              LOG("token received, expiresIn:", payload.expiresIn);
               cacheToken(payload.accessToken, payload.expiresIn ?? 3600);
               resolve(payload.accessToken);
             }
           } catch (e) {
-            LOG("failed to parse dialog message:", e);
             reject(new Error("Invalid message from auth dialog"));
           }
         });
         dialog.addEventHandler(Office.EventType.DialogEventReceived, (evt) => {
-          LOG("dialog event:", evt.error);
           if (evt.error === 12006) reject(new Error("Sign-in cancelled."));
         });
       }
@@ -51,96 +41,30 @@ function getTokenViaDialog() {
 
 async function getToken() {
   const cached = getCachedToken();
-  LOG("cached token present:", !!cached);
   if (cached) return cached;
   return getTokenViaDialog();
-}
-
-// ── Graph probes (run all in parallel, log everything) ───────────────────────
-async function probe(label, fetchFn) {
-  try {
-    await fetchFn();
-  } catch (e) {
-    LOG(`[PROBE] ${label} — EXCEPTION:`, e.message);
-  }
-}
-
-async function probeHttp(token, label, url) {
-  const headers = { Authorization: `Bearer ${token}` };
-  LOG(`[PROBE] ${label}\n  → ${url}`);
-  const res = await fetch(url, { headers });
-  const text = await res.text();
-  LOG(`[PROBE] ${label} — ${res.status}\n`, text);
-}
-
-async function probeEws(ewsId) {
-  const soap = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-               xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
-  <soap:Body>
-    <GetItem xmlns="http://schemas.microsoft.com/exchange/services/2006/messages">
-      <ItemShape>
-        <t:BaseShape>AllProperties</t:BaseShape>
-      </ItemShape>
-      <ItemIds>
-        <t:ItemId Id="${ewsId}"/>
-      </ItemIds>
-    </GetItem>
-  </soap:Body>
-</soap:Envelope>`;
-  LOG("[PROBE] EWS GetItem AllProperties — sending");
-  return new Promise(resolve => {
-    Office.context.mailbox.makeEwsRequestAsync(soap, result => {
-      LOG("[PROBE] EWS GetItem AllProperties —", result.status, "\n", result.value);
-      resolve();
-    });
-  });
-}
-
-async function runAllProbes(token, restMessageId, ewsId) {
-  const G = (ver, path) =>
-    `https://graph.microsoft.com/${ver}/me/messages/${restMessageId}${path}`;
-
-  await Promise.allSettled([
-    probe("v1.0 /extensions nav",              () => probeHttp(token, "v1.0 /extensions nav",              G("v1.0", "/extensions"))),
-    probe("beta /extensions nav",              () => probeHttp(token, "beta /extensions nav",              G("beta", "/extensions"))),
-    probe("v1.0 $expand=extensions (no filter)",() => probeHttp(token, "v1.0 $expand=extensions (no filter)",G("v1.0", "?$expand=extensions&$select=id"))),
-    probe("beta $expand=extensions (no filter)",() => probeHttp(token, "beta $expand=extensions (no filter)",G("beta", "?$expand=extensions&$select=id"))),
-    probe("v1.0 internetMessageHeaders",       () => probeHttp(token, "v1.0 internetMessageHeaders",       G("v1.0", "?$select=id,internetMessageId,internetMessageHeaders"))),
-    probe("v1.0 singleValueExtendedProperties",() => probeHttp(token, "v1.0 singleValueExtendedProperties",G("v1.0", "/singleValueExtendedProperties?$filter=startswith(id,'String')"))),
-    probe("beta singleValueExtendedProperties",() => probeHttp(token, "beta singleValueExtendedProperties",G("beta", "/singleValueExtendedProperties?$filter=startswith(id,'String')"))),
-    probe("EWS GetItem AllProperties",         () => probeEws(ewsId)),
-  ]);
 }
 
 // ── Graph ────────────────────────────────────────────────────────────────────
 async function fetchAllExtensions(token, restMessageId) {
   const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
-  LOG("fetching all extensions:", url);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  LOG("response status:", res.status);
   if (res.ok) {
     const json = await res.json();
-    LOG("extensions:", json.value);
     return { extensions: json.value ?? [], msaLimit: false };
   }
   if (res.status === 405) {
-    LOG("405 — personal MSA account; nav property not supported");
     return { extensions: [], msaLimit: true };
   }
   const text = await res.text();
-  LOG("response body:", text);
   throw new Error(`Graph ${res.status}: ${text}`);
 }
 
 async function fetchExtensionByName(token, restMessageId, name) {
   const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions/${encodeURIComponent(name)}`;
-  LOG("fetching by name:", url);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  LOG("response status:", res.status);
   if (res.status === 404) return null;
   const text = await res.text();
-  LOG("response body:", text);
   if (!res.ok) throw new Error(`Graph ${res.status}: ${text}`);
   return JSON.parse(text);
 }
@@ -221,50 +145,52 @@ function appendExtension(ext) {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 Office.onReady(async () => {
-  LOG("Office.onReady fired");
   try {
     const item = Office.context.mailbox.item;
     document.getElementById("ei-from").textContent    = item.from?.emailAddress ?? "—";
     document.getElementById("ei-subject").textContent = item.subject ?? "—";
 
-    LOG("ewsId (raw):", item.itemId);
     const restId = Office.context.mailbox.convertToRestId(
       item.itemId,
       Office.MailboxEnums.RestVersion.v2_0
     );
-    LOG("restId:", restId);
 
     setStatus("Authenticating…");
     const token = await getToken();
-
-    setStatus("Probing…");
-    await runAllProbes(token, restId, item.itemId);
 
     setStatus("Loading extensions…");
     const { extensions, msaLimit } = await fetchAllExtensions(token, restId);
 
     if (msaLimit) {
-      // Personal MSA accounts: surface the manual lookup UI
       setStatus("");
-      document.getElementById("msa-fallback").style.display = "block";
-      document.getElementById("lookup-btn").addEventListener("click", async () => {
-        const name = document.getElementById("ext-name-input").value.trim();
+      const fallback = document.getElementById("msa-fallback");
+      fallback.style.display = "block";
+
+      const input = document.getElementById("ext-name-input");
+      const container = document.getElementById("extensions-container");
+
+      const doLookup = async () => {
+        const name = input.value.trim();
         if (!name) return;
         setStatus("Looking up…");
-        document.getElementById("extensions-container").innerHTML = "";
+        container.innerHTML = "";
         try {
           const ext = await fetchExtensionByName(token, restId, name);
           setStatus("");
           if (!ext) {
-            setStatus(`No extension found: ${name}`, true);
+            setStatus(`Not found: ${name}`, true);
           } else {
             appendExtension(ext);
           }
         } catch (e) {
           setStatus(e.message || "Lookup failed.", true);
-          LOG("lookup error:", e);
         }
-      });
+      };
+
+      document.getElementById("lookup-btn").addEventListener("click", doLookup);
+
+      // Auto-trigger if the input has a default value
+      if (input.value.trim()) doLookup();
       return;
     }
 
@@ -281,6 +207,5 @@ Office.onReady(async () => {
     extensions.forEach(appendExtension);
   } catch (e) {
     setStatus(e.message || "Failed to load extensions.", true);
-    LOG("error:", e);
   }
 });
