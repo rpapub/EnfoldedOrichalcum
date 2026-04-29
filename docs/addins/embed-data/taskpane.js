@@ -151,9 +151,33 @@ function restoreFormFromStorage() {
   } catch (_) { return false; }
 }
 
+// ── Async prefill (fire-and-forget from onReady) ──────────────────────────────
+async function prefillFromExtension() {
+  const cached = getCachedToken();
+  if (!cached) return;
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "Loading…";
+  statusEl.className = "status";
+  try {
+    const restId = Office.context.mailbox.convertToRestId(
+      Office.context.mailbox.item.itemId,
+      Office.MailboxEnums.RestVersion.v2_0
+    );
+    const ext = await readGraphExtension(cached, restId, EXTENSION_NAME);
+    if (ext) populateFormFromExtension(ext);
+  } catch (_) {
+    // silent — form stays at defaults
+  } finally {
+    if (statusEl.textContent === "Loading…") {
+      statusEl.textContent = "";
+      statusEl.className = "status";
+    }
+  }
+}
+
 // ── Outlook (Office.js) path ──────────────────────────────────────────────────
 if (typeof Office !== "undefined") {
-  Office.onReady(async () => {
+  Office.onReady(() => {
     initForm();
 
     const item = Office.context.mailbox.item;
@@ -166,24 +190,7 @@ if (typeof Office !== "undefined") {
       console.warn("Could not read email properties:", e);
     }
 
-    // Restore any form data saved before the auth redirect reloaded the task pane.
-    // If there was pending data, skip the Graph read (user was mid-edit).
-    const hadPendingForm = restoreFormFromStorage();
-
-    if (!hadPendingForm) {
-      const cached = getCachedToken();
-      if (cached) {
-        try {
-          const restId = Office.context.mailbox.convertToRestId(
-            item.itemId,
-            Office.MailboxEnums.RestVersion.v2_0
-          );
-          const ext = await readGraphExtension(cached, restId, EXTENSION_NAME);
-          if (ext) populateFormFromExtension(ext);
-        } catch (_) { /* silent — form stays at defaults */ }
-      }
-    }
-
+    // Wire up save button immediately — don't block on the async prefill below
     document.getElementById("save-btn").addEventListener("click", async () => {
       const btn = document.getElementById("save-btn");
       btn.disabled = true;
@@ -208,6 +215,11 @@ if (typeof Office !== "undefined") {
         btn.disabled = false;
       }
     });
+
+    // Restore any form data saved before the auth redirect reloaded the task pane.
+    // If there was a pending mid-auth edit, skip the Graph read — user's edits win.
+    const hadPendingForm = restoreFormFromStorage();
+    if (!hadPendingForm) prefillFromExtension();
   });
 } else {
   // ── Browser preview / testbed path ───────────────────────────────────────────
