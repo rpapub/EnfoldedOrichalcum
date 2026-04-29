@@ -61,7 +61,8 @@ async function getToken() {
 // Use $expand instead of navigating /extensions directly — the navigation
 // property endpoint returns 405 for personal MSA (hotmail/outlook.com) accounts.
 async function fetchExtensions(token, restMessageId) {
-  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}?$expand=extensions&$select=id,extensions`;
+  // $filter on the expand is mandatory; `id gt ''` matches any non-empty extension id.
+  const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}?$expand=extensions($filter=id gt '')&$select=id,extensions`;
   LOG("fetching:", url);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   LOG("response status:", res.status, res.statusText);
