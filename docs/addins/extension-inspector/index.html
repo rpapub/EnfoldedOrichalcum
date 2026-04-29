@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Extension Inspector — Testbed</title>
+  <style>
+    :root {
+      --base3:  #fdf6e3;
+      --base2:  #eee8d5;
+      --base1:  #93a1a1;
+      --base0:  #657b83;
+      --base00: #586e75;
+      --blue:   #268bd2;
+      --orange: #cb4b16;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      color: var(--base0);
+      background: var(--base2);
+      padding: 0 0 32px;
+    }
+    .brand-bar {
+      background: var(--orange);
+      color: #fff;
+      padding: 10px 24px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    .brand-bar span { font-weight: 400; opacity: .85; font-size: 13px; margin-left: 12px; }
+    main {
+      max-width: 720px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+    h1 { font-size: 20px; font-weight: 700; color: var(--blue); margin-bottom: 8px; }
+    p  { color: var(--base0); line-height: 1.5; margin-bottom: 12px; }
+    .manifest-link {
+      display: inline-block; margin: 4px 0 16px;
+      padding: 8px 16px; background: var(--orange); color: #fff;
+      text-decoration: none; border-radius: 2px; font-weight: 700; font-size: 13px;
+    }
+    .manifest-link:hover { background: #a93d10; }
+    .note {
+      background: var(--base3); border-left: 3px solid var(--blue);
+      padding: 8px 12px; font-size: 12px; color: var(--base0);
+      border-radius: 0 2px 2px 0;
+    }
+    code {
+      background: var(--base2); padding: 1px 5px; border-radius: 2px;
+      font-family: "Cascadia Code", Consolas, monospace; font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="brand-bar">Extension Inspector <span>Outlook Add-in · read-only</span></div>
+  <main>
+    <h1>Extension Inspector</h1>
+    <p>
+      Reads and displays every open extension attached to the currently selected
+      email message via Microsoft Graph. Read-only — no data is written.
+    </p>
+    <p>
+      This add-in has no browser preview because it requires a live Outlook context
+      and a real message with extensions to show anything useful. Install it in
+      Outlook and open any email.
+    </p>
+
+    <a class="manifest-link" href="manifest.xml" download="manifest.xml">
+      Download manifest.xml
+    </a>
+
+    <p style="margin:0 0 4px;font-weight:600;font-size:12px">Outlook on the Web</p>
+    <p style="margin-bottom:12px">
+      Settings → <em>Manage Add-ins</em> → <em>Custom Add-ins</em> → Add from URL:<br/>
+      <code>https://rpapub.github.io/EnfoldedOrichalcum/addins/extension-inspector/manifest.xml</code>
+    </p>
+
+    <div class="note">
+      <strong>Graph endpoint used:</strong><br/>
+      <code>GET /v1.0/me/messages/{id}/extensions</code><br/><br/>
+      Returns all <code>microsoft.graph.openTypeExtension</code> objects on the message.
+      The add-in filters out <code>@odata.*</code> metadata and renders each extension
+      as a key-value card, with nested objects shown as indented sub-tables.
+    </div>
+  </main>
+</body>
+</html>
