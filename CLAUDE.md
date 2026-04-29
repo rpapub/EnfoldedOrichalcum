@@ -10,7 +10,7 @@ just install          # uv sync --group test && playwright install chromium
 
 # Validate a specific add-in manifest
 just validate                  # validates embed-data (default)
-just validate second-addin     # validates second-addin
+just validate extension-inspector
 
 # Validate all manifests
 just validate-all
@@ -29,6 +29,18 @@ just test-ui embed_data             # embed-data only
 # Run a single test
 uv run pytest tests/embed_data/test_manifest.py::test_bt_images_have_lowercase_size -v
 
+# Serve docs/ locally for development
+just serve             # python -m http.server 3000 --directory docs
+
+# Lint JavaScript
+just lint              # npx eslint docs/addins/**/*.js docs/shared/graph-utils.js
+
+# Run JavaScript unit tests (Vitest)
+just test-unit         # npx vitest run --reporter=verbose
+
+# Run browser preview Playwright tests (no Outlook context needed)
+just test-ui-preview   # tests/embed_data/test_ui_preview.py + tests/extension_inspector/test_ui_mocked.py
+
 # Interactive email triage CLI (opens Firefox in WSL for auth)
 just triage
 
@@ -45,7 +57,8 @@ docs/
 ├── index.html                        # landing page linking to each add-in
 ├── shared/
 │   ├── auth-dialog.html              # shared PKCE OAuth2 dialog
-│   └── graph-utils.js                # shared: getCachedToken, cacheToken, writeGraphExtension
+│   ├── solarized.css                 # shared Solarized Light CSS variables
+│   └── graph-utils.js                # shared: getCachedToken, cacheToken, clearCachedToken, graphError, writeGraphExtension
 └── addins/
     ├── embed-data/                   # RPA Embed Data add-in
     │   ├── index.html                # testbed + install guide
@@ -53,20 +66,26 @@ docs/
     │   ├── taskpane.js               # add-in logic (uses shared/graph-utils.js globals)
     │   ├── manifest.xml              # all URLs point to /addins/embed-data/
     │   └── assets/icon-{16,32,80}.png
-    └── second-addin/                 # placeholder skeleton
-        └── ...
+    └── extension-inspector/          # Extension Inspector add-in
+        ├── index.html
+        ├── taskpane.html
+        ├── taskpane.js
+        ├── manifest.xml
+        └── assets/icon-{16,32,80}.png
 
 scripts/
 └── embed_data_triage.py              # Python CLI for embed-data (MSAL, Graph API)
 
 tests/
 ├── conftest.py                       # ADDIN_BASE_URLS + ADDIN_MANIFEST_PATHS registry
+├── unit/
+│   └── graph-utils.test.js           # Vitest unit tests for graph-utils.js
 ├── embed_data/
 │   ├── test_manifest.py              # XML validation (no network)
-│   └── test_ui.py                    # Playwright (live GitHub Pages)
-└── second_addin/
-    ├── test_manifest.py
-    └── test_ui.py
+│   ├── test_ui.py                    # Playwright (live GitHub Pages)
+│   └── test_ui_preview.py            # Playwright (browser preview, no Office.js)
+└── extension_inspector/
+    ├── test_ui_mocked.py             # Playwright with mocked Graph (xfail until Office.js stub)
 ```
 
 ### Adding a new add-in
@@ -105,9 +124,15 @@ Before opening the auth dialog, the task pane serializes form fields to `localSt
 Loaded by each add-in's `taskpane.html` before `taskpane.js`. Exposes plain globals:
 - `getCachedToken()` — reads `localStorage` token cache
 - `cacheToken(accessToken, expiresIn)` — writes token cache
+- `clearCachedToken()` — removes the cached token (used by sign-out and 401 recovery)
+- `graphError(status, text)` — creates an `Error` with `.status` attached, for status-code branching in catch blocks
+- `readGraphExtension(token, restMessageId, extensionName)` — GET single extension by name; returns null on 404
+- `deleteGraphExtension(token, restMessageId, extensionId)` — DELETE extension; resolves on 204
 - `writeGraphExtension(token, restMessageId, extensionName, data)` — POST/PATCH Graph open extension
 
 `extensionName` is passed by the caller so each add-in can use its own extension name.
+
+The file also exports all functions via `module.exports` when running in Node.js (for Vitest tests), with no effect in browsers.
 
 ### Graph open extension
 
@@ -134,6 +159,9 @@ Uses MSAL Python (`acquire_token_interactive`) with `http://localhost` redirect 
 
 - `tests/embed_data/test_manifest.py` — parses `docs/addins/embed-data/manifest.xml` with lxml, validates structure, checks `bt:Image` uses lowercase `size` attribute (a real validator gotcha), verifies `EXTENSION_NAME` and client ID in `taskpane.js`. **No network required.**
 - `tests/embed_data/test_ui.py` — Playwright against the live `https://rpapub.github.io/EnfoldedOrichalcum/addins/embed-data` URL. Requires GitHub Pages to be deployed and up to date.
+- `tests/embed_data/test_ui_preview.py` — Playwright against the embed-data index.html browser preview (no Office.js). Covers form rendering, dropdown population, and save-button preview output.
+- `tests/extension_inspector/test_ui_mocked.py` — Playwright with mocked Graph API. Marked `xfail` until an Office.js stub is injected via `page.add_init_script`.
+- `tests/unit/graph-utils.test.js` — Vitest unit tests for `docs/shared/graph-utils.js`. Run with `just test-unit`.
 - `tests/conftest.py` — central registry of addin slugs, manifest paths, and live base URLs.
 
 ### Manifest gotchas

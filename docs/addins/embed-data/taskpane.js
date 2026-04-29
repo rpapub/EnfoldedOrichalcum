@@ -1,4 +1,4 @@
-/* global Office, getCachedToken, cacheToken, readGraphExtension, writeGraphExtension */
+/* global Office, getCachedToken, cacheToken, clearCachedToken, readGraphExtension, writeGraphExtension */
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 const CLIENT_ID      = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
@@ -165,8 +165,8 @@ async function prefillFromExtension() {
     );
     const ext = await readGraphExtension(cached, restId, EXTENSION_NAME);
     if (ext) populateFormFromExtension(ext);
-  } catch (_) {
-    // silent — form stays at defaults
+  } catch (e) {
+    if (e.status === 401) clearCachedToken(); // silent — next save will re-auth
   } finally {
     if (statusEl.textContent === "Loading…") {
       statusEl.textContent = "";
@@ -178,6 +178,18 @@ async function prefillFromExtension() {
 // ── Outlook (Office.js) path ──────────────────────────────────────────────────
 if (typeof Office !== "undefined") {
   Office.onReady(() => {
+    const taglines = [
+      "embed · enrich · automate",
+      "structured data, right on the message",
+      "tag it. route it. automate it.",
+      "from inbox to workflow",
+      "data in. noise out.",
+      "triage once. query forever.",
+      "attach meaning to your mail"
+    ];
+    document.getElementById("brand-bar").textContent =
+      taglines[new Date().getHours() % taglines.length];
+
     initForm();
 
     const item = Office.context.mailbox.item;
@@ -209,11 +221,22 @@ if (typeof Office !== "undefined") {
         await writeGraphExtension(token, restId, EXTENSION_NAME, data);
         showStatus("Saved to message extension.", false);
       } catch (e) {
-        showStatus(e.message || "Save failed.", true);
+        if (e.status === 401) {
+          clearCachedToken();
+          showStatus("Session expired — please sign in again and retry.", true);
+        } else {
+          showStatus(e.message || "Save failed.", true);
+        }
         console.error(e);
       } finally {
         btn.disabled = false;
       }
+    });
+
+    document.getElementById("signout-btn").addEventListener("click", (e) => {
+      e.preventDefault();
+      clearCachedToken();
+      location.reload();
     });
 
     // Restore any form data saved before the auth redirect reloaded the task pane.

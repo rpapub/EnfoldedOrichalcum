@@ -5,21 +5,9 @@
   <link rel="icon" href="data:,">
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>RPA Embed Data</title>
+  <link rel="stylesheet" href="../../shared/solarized.css">
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
   <style>
-    /* Solarized Light */
-    :root {
-      --base3:  #fdf6e3; /* main background   */
-      --base2:  #eee8d5; /* alt background    */
-      --base1:  #93a1a1; /* muted / borders   */
-      --base0:  #657b83; /* body text         */
-      --base00: #586e75; /* emphasis / labels */
-      --blue:   #268bd2;
-      --orange: #cb4b16; /* brand accent      */
-      --green:  #859900;
-      --red:    #dc322f;
-    }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -99,17 +87,23 @@
     .status       { min-height: 18px; margin-top: 6px; font-size: 12px; text-align: center; }
     .status.ok    { color: var(--green); }
     .status.error { color: var(--red); }
+
+    /* Sign out */
+    .signout-row {
+      text-align: center;
+      margin-top: 12px;
+    }
+    .signout-row a {
+      font-size: 11px;
+      color: var(--base1);
+      text-decoration: none;
+    }
+    .signout-row a:hover { color: var(--base00); text-decoration: underline; }
   </style>
 </head>
 <body>
 
-  <div class="brand-bar" id="brand-bar">v0.2.0</div>
-  <script>
-    (function(){
-      var t=["embed · enrich · automate","structured data, right on the message","tag it. route it. automate it.","from inbox to workflow","data in. noise out.","triage once. query forever.","attach meaning to your mail"];
-      document.getElementById("brand-bar").textContent=t[new Date().getHours()%t.length];
-    })();
-  </script>
+  <div class="brand-bar" id="brand-bar">RPA Embed Data</div>
 
   <div class="form-body">
 
@@ -171,10 +165,11 @@
 
   <button id="save-btn">RPA Embed Data</button>
   <div id="status" class="status"></div>
+  <p class="signout-row"><a href="#" id="signout-btn">Sign out</a></p>
 
   </div><!-- /.form-body -->
 
-  <script src="../../shared/graph-utils.js?v=2"></script>
-  <script src="taskpane.js?v=3"></script>
+  <script src="../../shared/graph-utils.js?v=3"></script>
+  <script src="taskpane.js?v=6"></script>
 </body>
 </html>

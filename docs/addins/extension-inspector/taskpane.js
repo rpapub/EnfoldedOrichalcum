@@ -1,4 +1,4 @@
-/* global Office, getCachedToken, cacheToken, deleteGraphExtension */
+/* global Office, getCachedToken, cacheToken, clearCachedToken, graphError, deleteGraphExtension */
 
 const CLIENT_ID  = "f28629c6-2f87-4afc-a6ff-1cbbd50166af";
 const DIALOG_URL = "https://rpapub.github.io/EnfoldedOrichalcum/shared/auth-dialog.html";
@@ -46,12 +46,6 @@ async function getToken() {
 }
 
 // ── Graph ────────────────────────────────────────────────────────────────────
-function graphError(status, text) {
-  const err = new Error(text || `Graph error ${status}`);
-  err.status = status;
-  return err;
-}
-
 async function fetchAllExtensions(token, restMessageId) {
   const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -129,6 +123,27 @@ function renderExtension(ext, onDelete) {
   title.textContent = rawId.replace(/^Microsoft\.OutlookServices\.OpenTypeExtension\./, "");
   header.appendChild(title);
 
+  // Copy JSON button
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "ext-card-copy";
+  copyBtn.textContent = "Copy";
+  copyBtn.addEventListener("click", async (ev) => {
+    ev.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(ext, null, 2));
+      copyBtn.textContent = "Copied!";
+      copyBtn.classList.add("copied");
+      setTimeout(() => {
+        copyBtn.textContent = "Copy";
+        copyBtn.classList.remove("copied");
+      }, 1500);
+    } catch (_) {
+      copyBtn.textContent = "Failed";
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+    }
+  });
+  header.appendChild(copyBtn);
+
   if (onDelete) {
     const delBtn = document.createElement("button");
     delBtn.className = "ext-card-delete";
@@ -147,7 +162,6 @@ function renderExtension(ext, onDelete) {
         pendingConfirm = true;
         delBtn.textContent = "Confirm?";
         delBtn.classList.add("confirm");
-        // Reset when user clicks anywhere outside the button
         const outsideHandler = (ev) => {
           if (!delBtn.contains(ev.target)) {
             resetBtn();
@@ -162,7 +176,6 @@ function renderExtension(ext, onDelete) {
       try {
         await onDelete(rawId);
         card.remove();
-        // If no extension cards remain, show empty state
         const container = document.getElementById("extensions-container");
         if (container.children.length === 0) {
           const empty = document.createElement("p");
@@ -204,6 +217,12 @@ Office.onReady(async () => {
   document.getElementById("ei-from").textContent    = item.from?.emailAddress ?? "—";
   document.getElementById("ei-subject").textContent = item.subject ?? "—";
 
+  document.getElementById("signout-btn").addEventListener("click", (e) => {
+    e.preventDefault();
+    clearCachedToken();
+    location.reload();
+  });
+
   const restId = Office.context.mailbox.convertToRestId(
     item.itemId,
     Office.MailboxEnums.RestVersion.v2_0
@@ -232,7 +251,10 @@ Office.onReady(async () => {
       appendExtension(ext, onDelete);
     });
   } catch (e) {
-    if (e.status === 405) {
+    if (e.status === 401) {
+      clearCachedToken();
+      setStatus("Session expired. Close and reopen the add-in to sign in again.", true);
+    } else if (e.status === 405) {
       // Personal MSA accounts don't support the extensions collection endpoint.
       // Fall back to name-based lookup.
       setStatus("");

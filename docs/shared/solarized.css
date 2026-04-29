@@ -1,0 +1,13 @@
+/* Solarized Light — shared across all add-in pages */
+:root {
+  --base3:  #fdf6e3;
+  --base2:  #eee8d5;
+  --base1:  #93a1a1;
+  --base0:  #657b83;
+  --base00: #586e75;
+  --blue:   #268bd2;
+  --orange: #cb4b16;
+  --green:  #859900;
+  --red:    #dc322f;
+  --yellow: #b58900;
+}

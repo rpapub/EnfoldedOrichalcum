@@ -17,11 +17,21 @@ function cacheToken(accessToken, expiresIn) {
   }));
 }
 
+function clearCachedToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function graphError(status, text) {
+  const err = new Error(text || `Graph error ${status}`);
+  err.status = status;
+  return err;
+}
+
 async function readGraphExtension(token, restMessageId, extensionName) {
   const url = `https://graph.microsoft.com/v1.0/me/messages/${restMessageId}/extensions/${encodeURIComponent(extensionName)}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Graph ${res.status}`);
+  if (!res.ok) throw graphError(res.status, `Graph ${res.status}`);
   return res.json();
 }
 
@@ -30,9 +40,7 @@ async function deleteGraphExtension(token, restMessageId, extensionId) {
   const res = await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 204 || res.ok) return;
   const text = await res.text().catch(() => "");
-  const err = new Error(text || `Graph error ${res.status}`);
-  err.status = res.status;
-  throw err;
+  throw graphError(res.status, text);
 }
 
 async function writeGraphExtension(token, restMessageId, extensionName, data) {
@@ -51,12 +59,20 @@ async function writeGraphExtension(token, restMessageId, extensionName, data) {
 
   if (res.status === 409) {
     res = await fetch(`${baseUrl}/${extensionName}`, { method: "PATCH", headers, body });
-    if (res.status !== 204) throw new Error(`Extension update failed: ${res.status}`);
+    if (res.status !== 204) throw graphError(res.status, `Extension update failed: ${res.status}`);
     return;
   }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`Graph API ${res.status}: ${detail}`);
+    throw graphError(res.status, detail);
   }
+}
+
+/* istanbul ignore next -- Node.js/test export only, no effect in browsers */
+if (typeof module !== "undefined") {
+  module.exports = {
+    getCachedToken, cacheToken, clearCachedToken,
+    graphError, readGraphExtension, writeGraphExtension, deleteGraphExtension
+  };
 }

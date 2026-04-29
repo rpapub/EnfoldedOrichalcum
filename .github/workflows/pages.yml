@@ -22,6 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate manifests
+        run: |
+          npx --yes office-addin-manifest validate docs/addins/embed-data/manifest.xml
+          npx --yes office-addin-manifest validate docs/addins/extension-inspector/manifest.xml
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

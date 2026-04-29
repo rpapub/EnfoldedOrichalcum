@@ -1,0 +1,11 @@
+{
+  "name": "enfolded-orichalcum",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9",
+    "vitest": "^2"
+  },
+  "scripts": {
+    "test:unit": "vitest run --reporter=verbose"
+  }
+}
