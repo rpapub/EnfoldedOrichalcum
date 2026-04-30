@@ -56,7 +56,6 @@ async function writeGraphExtension(token, restMessageId, extensionName, data) {
   const patchUrl = `${baseUrl}/${extensionName}`;
   const payload = {
     "@odata.type": "microsoft.graph.openTypeExtension",
-    id: extensionName,
     extensionName,
     ...data
   };
@@ -65,6 +64,9 @@ async function writeGraphExtension(token, restMessageId, extensionName, data) {
     "Authorization": `Bearer ${token}`,
     "Content-Type": "application/json"
   };
+
+  // PATCH body must contain only custom properties — no Graph metadata fields
+  const patchBody = JSON.stringify(data);
 
   console.log("[graph] POST", baseUrl);
   console.log("[graph] body", payload);
@@ -75,7 +77,7 @@ async function writeGraphExtension(token, restMessageId, extensionName, data) {
   // 409 = already exists; 500 = some Exchange backends return this instead of 409
   if (res.status === 409 || res.status === 500) {
     console.log(`[graph] ${res.status} → PATCH`, patchUrl);
-    res = await fetch(patchUrl, { method: "PATCH", headers, body });
+    res = await fetch(patchUrl, { method: "PATCH", headers, body: patchBody });
     console.log("[graph] PATCH status", res.status);
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
