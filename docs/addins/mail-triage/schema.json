@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://rpapub.github.io/EnfoldedOrichalcum/addins/mail-triage/schema.json",
   "title": "Mail Triage",
+  "version": "v0.1",
   "description": "Schema for the net.cprima.rpapub.CPMForge.M365.triage Graph open extension. triage and evidence are stored as JSON-serialized strings on the wire — Graph open extensions do not reliably support nested objects on personal MSA accounts.",
   "type": "object",
   "required": ["caseId", "caseStatus", "stateVersion", "triage"],
