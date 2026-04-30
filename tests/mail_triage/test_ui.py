@@ -63,16 +63,18 @@ def test_preview_output_shows_nested_json(testbed):
     assert "caseStatus" in data
     assert "stateVersion" in data
     assert "triage" in data
-    assert "result" in data["triage"]
-    assert "confidence" in data["triage"]
+    triage = json.loads(data["triage"])
+    assert "result" in triage
+    assert "confidence" in triage
 
 
 def test_preview_triage_defaults(testbed):
     testbed.locator("#save-btn").click()
     raw = testbed.locator("#preview-output").text_content()
     data = json.loads(raw)
-    assert data["triage"]["result"] == "no_action"
-    assert data["triage"]["confidence"] == "low"
+    triage = json.loads(data["triage"])
+    assert triage["result"] == "no_action"
+    assert triage["confidence"] == "low"
     assert "evidence" not in data  # no evidence for an untriaged preview
 
 

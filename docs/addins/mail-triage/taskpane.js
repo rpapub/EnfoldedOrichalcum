@@ -265,13 +265,13 @@ function buildOutput() {
     caseId:       document.getElementById("f-case-id").value.trim(),
     caseStatus:   document.getElementById("f-case-status").value,
     stateVersion: String(currentStateVersion),
-    triage: {
+    triage: JSON.stringify({
       result:     document.getElementById("f-triage-result").value,
       confidence: document.getElementById("f-triage-confidence").value,
       summary:    document.getElementById("f-triage-summary").value.trim(),
-    },
+    }),
   };
-  if (Object.keys(evidenceObj).length > 0) out.evidence = evidenceObj;
+  if (Object.keys(evidenceObj).length > 0) out.evidence = JSON.stringify(evidenceObj);
   return out;
 }
 
@@ -282,18 +282,16 @@ function populateFormFromExtension(ext) {
   currentStateVersion = parseInt(ext.stateVersion || "0", 10);
   document.getElementById("f-state-version").value = ext.stateVersion || "1";
 
-  if (ext.triage) {
-    if (ext.triage.result)          document.getElementById("f-triage-result").value     = ext.triage.result;
-    if (ext.triage.confidence)      document.getElementById("f-triage-confidence").value = ext.triage.confidence;
-    if (ext.triage.summary != null) document.getElementById("f-triage-summary").value    = ext.triage.summary;
-  }
+  const triage = typeof ext.triage === "string" ? JSON.parse(ext.triage) : (ext.triage || {});
+  if (triage.result)          document.getElementById("f-triage-result").value     = triage.result;
+  if (triage.confidence)      document.getElementById("f-triage-confidence").value = triage.confidence;
+  if (triage.summary != null) document.getElementById("f-triage-summary").value    = triage.summary;
 
-  if (ext.evidence) {
-    Object.entries(ext.evidence).forEach(([key, val]) => {
-      if (GRAPH_META.has(key)) return;
-      appendEvidenceField(key, val);
-    });
-  }
+  const evidence = typeof ext.evidence === "string" ? JSON.parse(ext.evidence) : (ext.evidence || {});
+  Object.entries(evidence).forEach(([key, val]) => {
+    if (GRAPH_META.has(key)) return;
+    appendEvidenceField(key, val);
+  });
 }
 
 // ── Form persistence ──────────────────────────────────────────────────────────
