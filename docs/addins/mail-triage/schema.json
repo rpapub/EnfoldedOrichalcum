@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://rpapub.github.io/EnfoldedOrichalcum/addins/mail-triage/schema.json",
   "title": "Mail Triage",
-  "description": "Schema for the net.cprima.rpapub.CPMForge.M365.triage Graph open extension",
+  "description": "Schema for the net.cprima.rpapub.CPMForge.M365.triage Graph open extension. triage and evidence are stored as JSON-serialized strings on the wire — Graph open extensions do not reliably support nested objects on personal MSA accounts.",
   "type": "object",
   "required": ["caseId", "caseStatus", "stateVersion", "triage"],
   "properties": {
@@ -22,6 +22,22 @@
       "description": "Monotonically incrementing version string, starts at 1"
     },
     "triage": {
+      "type": "string",
+      "title": "Triage",
+      "description": "JSON-serialized triage object",
+      "contentMediaType": "application/json",
+      "contentSchema": { "$ref": "#/$defs/triageObject" }
+    },
+    "evidence": {
+      "type": "string",
+      "title": "Evidence",
+      "description": "JSON-serialized evidence object; optional",
+      "contentMediaType": "application/json",
+      "contentSchema": { "$ref": "#/$defs/evidenceObject" }
+    }
+  },
+  "$defs": {
+    "triageObject": {
       "type": "object",
       "title": "Triage",
       "required": ["result", "confidence"],
@@ -42,10 +58,10 @@
         }
       }
     },
-    "evidence": {
+    "evidenceObject": {
       "type": "object",
       "title": "Evidence",
-      "description": "Optional; any additional properties are allowed — bot or human can write arbitrary keys",
+      "description": "Any additional properties are allowed — bot or human can write arbitrary keys",
       "additionalProperties": true,
       "properties": {
         "attachmentProfile": {

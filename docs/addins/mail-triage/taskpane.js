@@ -22,12 +22,12 @@ async function loadSchema() {
 }
 
 function evidenceProp(key) {
-  try { return triageSchema.properties.evidence.properties[key] || null; }
+  try { return triageSchema.$defs.evidenceObject.properties[key] || null; }
   catch (_) { return null; }
 }
 
 function evidenceProps() {
-  try { return triageSchema.properties.evidence.properties || {}; }
+  try { return triageSchema.$defs.evidenceObject.properties || {}; }
   catch (_) { return {}; }
 }
 
