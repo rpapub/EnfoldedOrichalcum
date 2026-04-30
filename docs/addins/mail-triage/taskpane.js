@@ -49,13 +49,13 @@ function populateSelect(id, options) {
 
 function initSelects() {
   populateSelect("f-case-status", [
-    ["new","new"], ["triaged","triaged"], ["in_progress","in_progress"],
-    ["resolved","resolved"], ["closed","closed"]
+    ["new","new"], ["triaged","triaged"], ["queued","queued"],
+    ["in_progress","in_progress"], ["residual_work","residual_work"],
+    ["closed","closed"], ["blocked","blocked"]
   ]);
   populateSelect("f-triage-result", [
     ["no_action","no_action"], ["work_required","work_required"],
-    ["information_only","information_only"], ["automated_candidate","automated_candidate"],
-    ["escalation_needed","escalation_needed"]
+    ["needs_human","needs_human"], ["duplicate","duplicate"], ["unsupported","unsupported"]
   ]);
   populateSelect("f-triage-confidence", [
     ["low","low"], ["medium","medium"], ["high","high"]
